@@ -1,0 +1,1658 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>初日診所 NP 追蹤儀表板</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.0/dist/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
+<style>
+:root { color-scheme: light; }
+* { box-sizing: border-box; }
+body {
+  font-family: "微軟正黑體", "Microsoft JhengHei", "PingFang TC", sans-serif;
+  margin: 0; padding: 16px;
+  background: #FAF4E8; color: #333; font-size: 14px;
+}
+h1 { font-size: 22px; color: #2E5A3A; margin: 0 0 12px; font-weight: 700; }
+h2 { font-size: 16px; color: #2E5A3A; margin: 0 0 12px; border-bottom: 2px solid #D9C8A8; padding-bottom: 6px; display: flex; align-items: center; gap: 8px; }
+h3 { font-size: 13px; color: #4A6B52; margin: 12px 0 6px; }
+.header { background: white; padding: 16px 20px; border-radius: 12px;
+  border-left: 5px solid #2E5A3A; margin-bottom: 16px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.controls { display: flex; gap: 16px; align-items: center; flex-wrap: wrap; margin-top: 8px; font-size: 13px; }
+.controls label { font-weight: 600; color: #555; display: flex; align-items: center; gap: 6px; }
+select, input[type="date"] { padding: 6px 10px; border: 1px solid #D9C8A8;
+  border-radius: 6px; background: #FFFAF0; font-size: 14px; font-weight: 600;
+  color: #2E5A3A; cursor: pointer; }
+.badge { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px; font-weight: 600; }
+.badge-sage { background: #E8F0EA; color: #2E5A3A; }
+.badge-warn { background: #FFF2CC; color: #7A5A1A; }
+.cards { display: grid; gap: 12px; margin-bottom: 12px; }
+.cards.all { grid-template-columns: repeat(3, 1fr); }
+.cards.single { grid-template-columns: 1fr; }
+.card { background: white; border-radius: 12px; padding: 14px 16px;
+  border: 1px solid #E8DDCC; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.card-header { font-size: 13px; color: white; background: #2E5A3A;
+  padding: 6px 10px; border-radius: 6px; font-weight: 700; margin-bottom: 10px; text-align: center; }
+.card-donut { display: grid; grid-template-columns: 1fr 100px; align-items: center; gap: 12px; }
+.donut-container { position: relative; width: 100px; height: 100px; }
+.card-metrics { display: flex; flex-direction: column; gap: 4px; }
+.card-row { display: flex; justify-content: space-between; align-items: baseline; margin: 2px 0; font-size: 12px; }
+.card-label { color: #888; }
+.card-big { font-size: 20px; font-weight: 800; color: #2E5A3A; }
+.card-actual { color: #7A3A1A; }
+.overall { background: #2E5A3A; color: white; padding: 12px 20px; border-radius: 10px;
+  display: flex; justify-content: space-around; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+.overall > div { text-align: center; }
+.overall-label { font-size: 11px; opacity: 0.8; margin-bottom: 2px; }
+.overall-val { font-size: 20px; font-weight: 700; }
+.alerts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+.alert-box { background: white; border-radius: 10px; padding: 12px 16px;
+  border-left: 4px solid; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.alert-red { border-color: #C0392B; background: #FFF5F3; }
+.alert-yellow { border-color: #E0A030; background: #FFFBF0; }
+.alert-box h3 { margin: 0 0 8px; font-size: 13px; }
+.alert-red h3 { color: #C0392B; }
+.alert-yellow h3 { color: #B08030; }
+.alert-item { font-size: 12px; padding: 4px 0; border-bottom: 1px dashed #E0D8C0; }
+.alert-item:last-child { border-bottom: 0; }
+.alert-item strong { color: #2E5A3A; }
+.section { background: white; border-radius: 10px; padding: 16px;
+  margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+.chart-container { position: relative; height: 320px; }
+.chart-container-small { position: relative; height: 240px; }
+/* === 新明細表: 卡片式一列一位醫師 === */
+.doc-list { display: flex; flex-direction: column; gap: 8px; }
+.doc-row-wrap {
+  background: #FAF7EE; border-radius: 8px; overflow: hidden;
+  border-left: 4px solid transparent; padding: 0 12px 8px 12px;
+  transition: background 0.2s;
+}
+.doc-row-wrap:hover { background: #F0E8D0; }
+.doc-row-wrap .doc-row { padding: 12px 2px 6px 2px; background: transparent; border-left: 0; border-radius: 0; }
+.doc-row {
+  display: grid;
+  grid-template-columns: 55px 130px 1fr 150px 180px;
+  gap: 12px; align-items: center;
+  padding: 12px 14px; border-radius: 8px;
+  background: #FAF7EE; border-left: 4px solid transparent;
+  transition: background 0.2s;
+}
+.doc-row:hover { background: #F0E8D0; }
+.doc-row.st-green { border-color: #4A6B52; }
+.doc-row-wrap:has(.doc-row.st-green) { border-color: #4A6B52; background: #FAF7EE; }
+.doc-row.st-yellow { border-color: #E0A030; }
+.doc-row-wrap:has(.doc-row.st-yellow) { border-color: #E0A030; background: #FFFCF3; }
+.doc-row.st-red { border-color: #C0392B; background: #FFF5F3; }
+.doc-row-wrap:has(.doc-row.st-red) { border-color: #C0392B; background: #FFF5F3; }
+.doc-row.st-inactive { border-color: #999; opacity: 0.6; }
+.doc-clinic { font-size: 11px; color: #888; background: #E8DDCC; padding: 3px 8px; border-radius: 10px; text-align: center; font-weight: 600; }
+.doc-name { font-weight: 700; color: #333; font-size: 14px; }
+.doc-progress { position: relative; height: 32px; background: #F0E8D0; border-radius: 6px; overflow: visible; margin-top: 22px; margin-bottom: 22px; margin-right: 60px; }
+.doc-progress-fill { position: absolute; left: 0; top: 0; height: 100%; border-radius: 6px; display: flex; align-items: center; justify-content: center; color: white; font-weight: 700; font-size: 12px; min-width: 40px; }
+.doc-progress-fill.g { background: linear-gradient(90deg, #4A6B52, #2E5A3A); }
+.doc-progress-fill.y { background: linear-gradient(90deg, #E0A030, #C08020); }
+.doc-progress-fill.r { background: linear-gradient(90deg, #D06060, #A03020); }
+.doc-progress-fill.i { background: #999; }
+.doc-time-marker {
+  position: absolute; top: -4px; bottom: -4px; width: 3px;
+  background: #333; border-radius: 2px; z-index: 3;
+}
+.doc-time-marker::after {
+  content: '📍 今日應到'; position: absolute; top: -18px; left: -26px;
+  font-size: 10px; color: #333; white-space: nowrap; font-weight: 600;
+}
+.doc-base-marker {
+  position: absolute; top: -4px; bottom: -4px; width: 2px;
+  background: #2E5A3A; border-radius: 2px; z-index: 2;
+}
+.doc-base-marker::after {
+  content: '🎯 基準'; position: absolute; bottom: -18px; left: -18px;
+  font-size: 10px; color: #2E5A3A; white-space: nowrap; font-weight: 700;
+}
+.doc-challenge-marker {
+  position: absolute; top: -4px; bottom: -4px; width: 2px;
+  background: #8B5530; border-radius: 2px; z-index: 2;
+}
+.doc-challenge-marker::after {
+  content: '🚀 挑戰'; position: absolute; bottom: -18px; left: -18px;
+  font-size: 10px; color: #8B5530; white-space: nowrap; font-weight: 700;
+}
+.doc-max-badge {
+  position: absolute; right: -60px; top: 50%; transform: translateY(-50%);
+  font-size: 10px; color: #666; white-space: nowrap; font-weight: 600;
+}
+.doc-status-text { text-align: center; font-weight: 700; font-size: 13px; }
+.doc-status-text.g { color: #2E5A3A; }
+.doc-status-text.y { color: #B08030; }
+.doc-status-text.r { color: #C0392B; }
+.doc-status-text .sub { display: block; font-weight: 400; font-size: 11px; color: #666; margin-top: 2px; }
+.doc-suggestion { font-size: 12px; color: #555; line-height: 1.4; }
+.doc-spend-info {
+  display: grid; grid-template-columns: 1fr 100px 100px;
+  gap: 8px; align-items: center; margin-top: 6px; padding-top: 6px;
+  border-top: 1px dashed #E0D8C0; font-size: 11px; color: #666;
+}
+.doc-spend-bar {
+  position: relative; height: 8px; background: #F0E8D0; border-radius: 4px; overflow: hidden;
+}
+.doc-spend-fill { height: 100%; background: linear-gradient(90deg, #8B7355, #5A4633); border-radius: 4px; }
+.doc-spend-fill.over { background: linear-gradient(90deg, #C08020, #8B5530); }
+.doc-spend-fill-before { position: absolute; left: 0; top: 0; height: 100%; background: linear-gradient(90deg, #8B7355, #5A4633); border-radius: 4px 0 0 4px; }
+.doc-spend-fill-before.over { background: linear-gradient(90deg, #C08020, #8B5530); }
+.doc-spend-fill-after { position: absolute; top: 0; height: 100%; background: linear-gradient(90deg, #8B7355, #5A4633); opacity: 0.5; border-left: 1px dashed rgba(255,255,255,0.9); border-radius: 0 4px 4px 0; }
+.doc-spend-fill-after.over { background: linear-gradient(90deg, #C08020, #8B5530); opacity: 0.5; }
+.doc-spend-split-label { color: #6A4C93; font-weight: 600; }
+.doc-cpa-badge {
+  padding: 2px 6px; border-radius: 4px; font-weight: 700; text-align: center;
+}
+.doc-cpa-badge.g { background: #C6EFCE; color: #276843; }
+.doc-cpa-badge.y { background: #FFEB9C; color: #7A5A1A; }
+.doc-cpa-badge.r { background: #FFC7CE; color: #8B1A1A; }
+.doc-cpa-badge.n { background: #EEE; color: #888; }
+.doc-spend-label { color: #7A5A1A; font-weight: 600; }
+.legend-row { display: flex; gap: 20px; margin-top: 12px; padding: 10px 12px; background: #FAF7EE; border-radius: 6px; font-size: 11.5px; color: #555; flex-wrap: wrap; }
+.legend-row span { display: flex; align-items: center; gap: 6px; }
+.legend-marker { display: inline-block; width: 16px; height: 12px; border-radius: 3px; }
+.legend-marker.g { background: #4A6B52; }
+.legend-marker.y { background: #E0A030; }
+.legend-marker.r { background: #C0392B; }
+.legend-marker.time { background: #333; width: 3px; height: 16px; }
+/* === 同期比較 卡片式 === */
+.compare-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+.compare-card {
+  background: #FAF7EE; border-radius: 10px; padding: 14px;
+  border-left: 4px solid #8B5530;
+}
+.compare-card.growing { border-color: #2E5A3A; background: #F0F7EF; }
+.compare-card.declining { border-color: #C0392B; background: #FFF5F3; }
+.compare-card.stable { border-color: #8B5530; }
+.compare-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; }
+.compare-title { font-weight: 700; color: #333; font-size: 14px; }
+.compare-trend { font-size: 20px; font-weight: 800; }
+.compare-trend.up { color: #2E5A3A; }
+.compare-trend.down { color: #C0392B; }
+.compare-trend.flat { color: #888; }
+.compare-months { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 6px; margin: 10px 0; }
+.compare-month {
+  text-align: center; padding: 8px 4px; background: white; border-radius: 6px;
+}
+.compare-month .m-label { font-size: 10px; color: #888; font-weight: 600; }
+.compare-month .m-np { font-size: 20px; font-weight: 800; color: #2E5A3A; margin: 2px 0; }
+.compare-month .m-rate { font-size: 10px; color: #666; }
+.compare-month.now { background: #E8F0EA; border: 1px solid #2E5A3A; }
+.compare-month.now .m-np { color: #7A3A1A; }
+.compare-verdict { font-size: 11.5px; color: #555; padding: 6px 8px; background: white; border-radius: 4px; margin-top: 8px; }
+.compare-verdict strong { color: #333; }
+.chip { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 12px;
+  background: #E8F0EA; color: #2E5A3A; margin-right: 6px; font-weight: 600; }
+.insight-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 10px; }
+.insight-card { padding: 12px 14px; border-radius: 8px; background: #FAF4E8; border-left: 4px solid; }
+.insight-card.pos { border-color: #2E5A3A; }
+.insight-card.neg { border-color: #C0392B; }
+.insight-card.info { border-color: #E0A030; }
+.insight-card h4 { margin: 0 0 6px; font-size: 12px; color: #666; font-weight: 700; }
+.insight-card .val { font-size: 20px; font-weight: 800; color: #2E5A3A; margin-bottom: 4px; }
+.insight-card .val.neg { color: #C0392B; }
+.insight-card .desc { font-size: 11.5px; color: #555; line-height: 1.5; }
+.center-msg { padding: 60px 20px; text-align: center; color: #666; font-size: 14px;
+  background: white; border-radius: 10px; margin: 20px 0; }
+@media (max-width: 900px) {
+  .cards.all { grid-template-columns: 1fr; }
+  .alerts { grid-template-columns: 1fr; }
+  .overall { flex-direction: column; gap: 8px; }
+  .doc-row { grid-template-columns: 1fr; }
+  .two-col { grid-template-columns: 1fr; }
+}
+/* === Sprint 2: Tab UI === */
+.tabs {
+  display: flex; gap: 4px; background: white; border-radius: 10px;
+  padding: 6px; margin-bottom: 16px; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+  overflow-x: auto; white-space: nowrap;
+}
+.tab-btn {
+  padding: 10px 16px; border: none; border-radius: 8px; cursor: pointer;
+  font-family: inherit; font-size: 13px; font-weight: 600; color: #666;
+  background: transparent; transition: all 0.2s;
+}
+.tab-btn:hover { background: #F5EBD8; color: #2E5A3A; }
+.tab-btn.active { background: #2E5A3A; color: white; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.info-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px,1fr)); gap: 12px; margin-bottom: 14px; }
+.info-card {
+  background: white; border-radius: 8px; padding: 12px 14px;
+  border-left: 4px solid #2E5A3A; box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+}
+.info-card h4 { margin: 0 0 6px; font-size: 11px; color: #888; font-weight: 700; }
+.info-card .val { font-size: 20px; font-weight: 800; color: #2E5A3A; }
+.info-card .sub { font-size: 11px; color: #666; margin-top: 4px; }
+.mat-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+.mat-table th { background: #2E5A3A; color: white; padding: 8px; text-align: left; font-weight: 600; }
+.mat-table td { padding: 8px; border-bottom: 1px solid #F0E8D0; }
+.mat-table tr:hover { background: #FAF7EE; }
+.mat-cpa-tag { padding: 2px 6px; border-radius: 4px; font-weight: 700; }
+.mat-cpa-tag.g { background: #C6EFCE; color: #276843; }
+.mat-cpa-tag.y { background: #FFEB9C; color: #7A5A1A; }
+.mat-cpa-tag.r { background: #FFC7CE; color: #8B1A1A; }
+.footer-note { font-size: 11px; color: #888; text-align: center; padding: 8px; }
+.data-source-tag { display: inline-block; margin-left: 8px; padding: 2px 8px;
+  border-radius: 10px; font-size: 11px; font-weight: 600; }
+.tag-snapshot { background: #FFF2CC; color: #7A5A1A; }
+.two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 16px; }
+</style>
+</head>
+<body>
+<div id="pwGate" style="position:fixed; inset:0; z-index:99999; background:linear-gradient(135deg,#F5EFE0,#E8DDCC); display:flex; align-items:center; justify-content:center; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Noto Sans TC',sans-serif;">
+  <div style="background:#fff; padding:36px 32px; border-radius:14px; box-shadow:0 8px 30px rgba(0,0,0,0.15); width:320px; text-align:center;">
+    <div style="font-size:32px; margin-bottom:8px;">🔒</div>
+    <div style="font-weight:700; font-size:16px; color:#333; margin-bottom:4px;">初日診所 NP 追蹤儀表板</div>
+    <div style="font-size:12px; color:#888; margin-bottom:18px;">請輸入密碼以檢視內容</div>
+    <input id="pwInput" type="password" placeholder="密碼" style="width:100%; box-sizing:border-box; padding:10px 12px; border:1px solid #DDD; border-radius:8px; font-size:14px; margin-bottom:10px;">
+    <button id="pwSubmit" style="width:100%; padding:10px; border:none; border-radius:8px; background:#5A4633; color:#fff; font-weight:700; font-size:14px; cursor:pointer;">進入</button>
+    <div id="pwError" style="color:#C0392B; font-size:12px; margin-top:10px; display:none;">密碼錯誤，請再試一次</div>
+  </div>
+</div>
+<script>
+(function(){
+  var PW_HASH = '6a6317260f323e4160d20c5012794b57694c4f45192fcb5a675a363d57a2b93b';
+  var gate = document.getElementById('pwGate');
+  var input = document.getElementById('pwInput');
+  var btn = document.getElementById('pwSubmit');
+  var err = document.getElementById('pwError');
+  function sha256Hex(str) {
+    var enc = new TextEncoder().encode(str);
+    return crypto.subtle.digest('SHA-256', enc).then(function(buf){
+      return Array.from(new Uint8Array(buf)).map(function(b){ return b.toString(16).padStart(2,'0'); }).join('');
+    });
+  }
+  function tryUnlock() {
+    sha256Hex(input.value).then(function(hash){
+      if (hash === PW_HASH) {
+        sessionStorage.setItem('npDashUnlocked', '1');
+        gate.style.display = 'none';
+      } else {
+        err.style.display = 'block';
+        input.value = '';
+        input.focus();
+      }
+    });
+  }
+  btn.addEventListener('click', tryUnlock);
+  input.addEventListener('keydown', function(e){ if (e.key === 'Enter') tryUnlock(); });
+  if (sessionStorage.getItem('npDashUnlocked') === '1') {
+    gate.style.display = 'none';
+  } else {
+    input.focus();
+  }
+})();
+</script>
+
+<div class="header">
+  <h1>📊 初日診所 NP 預約追蹤儀表板</h1>
+  <div class="controls">
+    <label>🏥 院所：<select id="clinicSel">
+      <option value="全部">全部院所</option>
+      <option value="台北">台北初日</option>
+      <option value="新竹">新竹初日</option>
+      <option value="高雄">高雄初日</option>
+    </select></label>
+    <label>📅 追蹤月份：<select id="monthSel"></select></label>
+    <label>資料截止：<input type="date" id="dateSel"></label>
+    <span id="dataStatus" class="badge badge-sage"></span>
+    <span id="timeProgress" class="badge badge-warn"></span>
+  </div>
+</div>
+<div id="content">
+  <div class="tabs">
+    <button class="tab-btn active" data-tab="progress">🎯 進度總覽</button>
+    <button class="tab-btn" data-tab="spend">💰 花費追蹤</button>
+    <button class="tab-btn" data-tab="angle">🎨 素材切角</button>
+    <button class="tab-btn" data-tab="audience">👥 受眾分析</button>
+    <button class="tab-btn" data-tab="overall">📊 綜合成效</button>
+  </div>
+  <div class="tab-content active" id="tab-progress">
+  <div class="cards all" id="clinicCards"></div>
+  <div class="overall" id="overallBar"></div>
+  <div class="alerts">
+    <div class="alert-box alert-red">
+      <h3>🔴 需立即行動（達成率 &lt; 75%）</h3>
+      <div id="redAlerts"></div>
+    </div>
+    <div class="alert-box alert-yellow">
+      <h3>🟡 觀察中（達成率 75-90%）</h3>
+      <div id="yellowAlerts"></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>📋 各醫師 / 不指定 進度總覽 <span id="filterChip"></span></h2>
+    <p style="font-size:12px; color:#666; margin: 0 0 14px;">橫條 = 累積 NP  ｜  📍 今日應到（依時間推算）  ｜  🎯 基準目標  ｜  🚀 挑戰目標（+10%）  ｜  🏁 最高開放（本月天花板）</p>
+<div style="background: #FFF7E6; border-left: 4px solid #E0A030; padding: 10px 14px; border-radius: 6px; margin-bottom: 14px; font-size: 12.5px; color: #555; line-height: 1.6;">
+  <strong>📖 如何判讀：</strong>橫條軸的 100% = <b>🏁 最高開放</b>(該月能接的 NP 上限)。橫條走到 <b>🎯 基準線</b> = 達成保守目標，走到 <b>🚀 挑戰線</b> = 超越預期。<b>📍 今日應到</b> = 依時間計算此時應到的位置，橫條超過就是準點/超前，沒到就是落後。
+</div>
+<div id="docList" class="doc-list"></div>
+    <div class="legend-row">
+      <span><span class="legend-marker time"></span> 📍 今日應到</span>
+      <span><span class="legend-marker" style="background: #2E5A3A; width: 3px; height: 16px;"></span> 🎯 基準目標(保守值)</span>
+      <span><span class="legend-marker" style="background: #8B5530; width: 3px; height: 16px;"></span> 🚀 挑戰目標(+10%)</span>
+      <span>🏁 = 最高開放上限</span>
+      <span><span class="legend-marker g"></span> 準點/超前</span>
+      <span><span class="legend-marker y"></span> 略慢，觀察</span>
+      <span><span class="legend-marker r"></span> 落後，需行動</span>
+      <span>💡 橫條 = 累積 NP／目標 NP</span>
+    </div>
+  </div>
+  <div class="section">
+    <h2>🚪 開診日 NP 預約切分 <span id="npOpeningChip"></span></h2>
+    <p style="font-size:12px; color:#666; margin: 0 0 12px;">用同一組「次月開診日」(從NP資料自動偵測，與花費追蹤頁籤一致)，看本月NP累積有多少是開診前達成、多少是開診後才追上</p>
+    <div id="npOpeningSplitTable"></div>
+  </div>
+  <div class="section">
+    <h2>📆 三月同期比較 <span id="filterChip2"></span></h2>
+    <p style="font-size:12px; color:#666; margin: 0 0 12px;">比較 5月、6月、7月同天位置的 NP 累積 — 卡片依趨勢排序，衰退最多在前</p>
+    <div id="compareGrid" class="compare-grid"></div>
+  </div>
+  <div class="two-col">
+    <div class="section">
+      <h2>🔀 不指定 5-7 月走勢對照</h2>
+      <p style="font-size:11.5px; color:#666; margin: 0 0 8px;">各院所每月「不指定 NP 累積」曲線</p>
+      <div class="chart-container-small"><canvas id="chartUnspec"></canvas></div>
+    </div>
+    <div class="section">
+      <h2>📊 各醫師不指定率變化</h2>
+      <p style="font-size:11.5px; color:#666; margin: 0 0 8px;">不指定率 = 該醫師不指定 NP ÷ 已預約 NP</p>
+      <div class="chart-container-small"><canvas id="chartUnspecRatio"></canvas></div>
+    </div>
+  </div>
+  <div class="section">
+    <h2>📈 累積 NP 走勢</h2>
+    <div class="chart-container"><canvas id="chart"></canvas></div>
+  </div>
+  <div class="section">
+    <h2>💡 本週洞察與行銷分析</h2>
+    <div id="insights" class="insight-grid"></div>
+  </div>
+    </div><!-- end tab-progress -->
+  <div class="tab-content" id="tab-spend">
+    <div class="section">
+      <h2>💰 各醫師每日花費追蹤 (7月)</h2>
+      <p style="font-size:12px; color:#666; margin:0 0 12px;">看每醫師本月花費進度 vs 3個月平均預算基準</p>
+      <div class="info-cards" id="spendCards"></div>
+      <div class="chart-container"><canvas id="chartSpend"></canvas></div>
+    </div>
+    <div class="section">
+      <h2>🚪 開診日花費切分 <span id="openingDateChip"></span></h2>
+      <p style="font-size:12px; color:#666; margin:0 0 12px;">次月開診日 = NP累積數明顯跳增那天的前一天(從NP資料自動偵測)。切分本月花費，看開診前/開診後兩階段的投入差異。</p>
+      <div id="openingSplitTable"></div>
+    </div>
+  </div>
+  <div class="tab-content" id="tab-angle">
+    <div class="section">
+      <h2>🎨 各切角類型成效 (7月)</h2>
+      <p style="font-size:12px; color:#666; margin:0 0 12px;">看哪些切角 CPA 最低最有效率 | 月份型/區域型/案例型/品牌通用型/品牌痛點型/知識型/醫師IP</p>
+      <div class="controls" style="margin-bottom:12px;">
+        <label>👨‍⚕️ 醫師：<select id="angleDoctorSel"><option value="全部">全部醫師</option></select></label>
+        <label>🎨 切角：<select id="angleTypeSel"><option value="全部">全部切角</option></select></label>
+      </div>
+      <div class="chart-container"><canvas id="chartAngle"></canvas></div>
+    </div>
+    <div class="section">
+      <h2>📋 Top 20 高花費素材 <span id="angleFilterChip"></span></h2>
+      <p style="font-size:12px; color:#666; margin:0 0 12px;">7月花費前 20 名素材, CPA 綠燈=高效 (低於院所醫師 CPA 中位數 x 1.2) 紅燈=需檢視。上方院所/醫師/切角篩選同時套用於此表。</p>
+      <div id="materialTable"></div>
+    </div>
+  </div>
+  <div class="tab-content" id="tab-audience">
+    <div class="section">
+      <h2>👥 受眾類型分析 (7月)</h2>
+      <p style="font-size:12px; color:#666; margin:0 0 12px;">NU=新客 / RT=再行銷 / ASC=Advantage+ 智慧受眾</p>
+      <div class="info-cards" id="audCards"></div>
+      <div class="chart-container"><canvas id="chartAudience"></canvas></div>
+    </div>
+    <div class="section">
+      <h2>🏆 高效受眾組合明細 (7月)</h2>
+      <p style="font-size:12px; color:#666; margin:0 0 12px;">拆解到實際「廣告組合」層級，而非只看 NU/RT/ASC 大分類，找出真正表現好的受眾設定。綠燈=CPA低於院所中位數x1.2，紅燈=高於x1.5</p>
+      <div id="audienceDetailTable"></div>
+    </div>
+  </div>
+  <div class="tab-content" id="tab-overall">
+    <div class="section">
+      <h2>📊 Meta 完成預約 vs NP 已預約 (7月)</h2>
+      <p style="font-size:12px; color:#666; margin:0 0 12px;">Meta = 廣告端追蹤的預約事件, NP = 診所系統實際新患數。差距大表示有取消/no-show</p>
+      <div class="chart-container"><canvas id="chartOverall"></canvas></div>
+    </div>
+  </div>
+  <div class="footer-note">🚀 突破挑戰  ｜  🎯 達基準  ｜  ✅ 準點  ｜  🟡 略慢  ｜  🔴 落後</div>
+</div>
+<script>
+const TARGETS = {
+  '台北': { '宋晏仁': 57, '鄧雯心': 57, '李唐越': 15, '周建安': 66, '許芷瑜': 55,
+           '魏士航': 8, '陳威龍': 91, '王律婷': 7, '王律婷(成長)': 3, '不指定 (分流)': 175 },
+  '新竹': { '魏士航': 60, '王律婷': 48, '王律婷(成長)': 10, '楊德仁 (新)': 15, '不指定 (分流)': 66 },
+  '高雄': { '李唐越': 76, '李思賢': 40, '范亞萱': 59, '劉曜增': 61, '不指定 (分流)': 126 }
+};
+const TARGETS_CHALLENGE = {
+  '台北': { '宋晏仁': 67, '鄧雯心': 67, '李唐越': 22, '周建安': 78, '許芷瑜': 65,
+           '魏士航': 15, '陳威龍': 107, '王律婷': 14, '王律婷(成長)': 9, '不指定 (分流)': 193 },
+  '新竹': { '魏士航': 66, '王律婷': 54, '王律婷(成長)': 16, '楊德仁 (新)': 25, '不指定 (分流)': 73 },
+  '高雄': { '李唐越': 84, '李思賢': 46, '范亞萱': 65, '劉曜增': 67, '不指定 (分流)': 139 }
+};
+const MAX_OPEN = {
+  '台北': { '宋晏仁': 72, '鄧雯心': 74, '李唐越': 23, '周建安': 119, '許芷瑜': 92,
+           '魏士航': 14, '陳威龍': 158, '王律婷': 8, '王律婷(成長)': 6 },
+  '新竹': { '魏士航': 79, '王律婷': 85, '王律婷(成長)': 10, '楊德仁 (新)': 75 },
+  '高雄': { '李唐越': 63, '李思賢': 140, '范亞萱': 123, '劉曜增': 185 }
+};
+const DOCTOR_ORDER = {
+  '台北': ['宋晏仁','鄧雯心','李唐越','周建安','許芷瑜','魏士航','陳威龍','王律婷','王律婷(成長)','不指定 (分流)'],
+  '新竹': ['魏士航','王律婷','王律婷(成長)','楊德仁 (新)','不指定 (分流)'],
+  '高雄': ['李唐越','李思賢','范亞萱','劉曜增','不指定 (分流)']
+};
+const NAME_MAP = { '楊德仁': '楊德仁 (新)' };
+const ANGLE_SNAPSHOT = {"5":{"台北":{"月份型":{"spend":393600.0,"meta":118,"cpa":3336.0},"區域型":{"spend":217217.0,"meta":73,"cpa":2976.0},"案例型":{"spend":13367.0,"meta":0,"cpa":null},"品牌通用型":{"spend":308398.0,"meta":72,"cpa":4283.0},"品牌痛點型":{"spend":86177.0,"meta":25,"cpa":3447.0},"知識型":{"spend":272536.0,"meta":60,"cpa":4542.0},"未分類":{"spend":32882.0,"meta":0,"cpa":null}},"新竹":{"月份型":{"spend":107104.0,"meta":24,"cpa":4463.0},"區域型":{"spend":62793.0,"meta":28,"cpa":2243.0},"案例型":{"spend":24379.0,"meta":0,"cpa":null},"品牌通用型":{"spend":179799.0,"meta":116,"cpa":1550.0},"品牌痛點型":{"spend":135656.0,"meta":79,"cpa":1717.0},"知識型":{"spend":103908.0,"meta":13,"cpa":7993.0},"未分類":{"spend":223571.0,"meta":103,"cpa":2171.0}},"高雄":{"月份型":{"spend":251085.0,"meta":77,"cpa":3261.0},"區域型":{"spend":178134.0,"meta":42,"cpa":4241.0},"案例型":{"spend":256188.0,"meta":95,"cpa":2697.0},"品牌通用型":{"spend":176295.0,"meta":47,"cpa":3751.0},"品牌痛點型":{"spend":163961.0,"meta":30,"cpa":5465.0},"知識型":{"spend":178333.0,"meta":23,"cpa":7754.0},"未分類":{"spend":114344.0,"meta":8,"cpa":14293.0}}},"6":{"台北":{"月份型":{"spend":324586.0,"meta":111,"cpa":2924.0},"區域型":{"spend":29696.0,"meta":11,"cpa":2700.0},"案例型":{"spend":84063.0,"meta":22,"cpa":3821.0},"品牌通用型":{"spend":106125.0,"meta":44,"cpa":2412.0},"品牌痛點型":{"spend":84402.0,"meta":22,"cpa":3836.0},"知識型":{"spend":260853.0,"meta":79,"cpa":3302.0},"未分類":{"spend":30097.0,"meta":12,"cpa":2508.0}},"新竹":{"月份型":{"spend":146162.0,"meta":46,"cpa":3177.0},"案例型":{"spend":84953.0,"meta":36,"cpa":2360.0},"品牌通用型":{"spend":101365.0,"meta":41,"cpa":2472.0},"品牌痛點型":{"spend":87711.0,"meta":23,"cpa":3814.0},"知識型":{"spend":60012.0,"meta":15,"cpa":4001.0},"未分類":{"spend":107119.0,"meta":24,"cpa":4463.0}},"高雄":{"月份型":{"spend":247612.0,"meta":66,"cpa":3752.0},"區域型":{"spend":35647.0,"meta":4,"cpa":8912.0},"案例型":{"spend":180612.0,"meta":54,"cpa":3345.0},"品牌通用型":{"spend":128303.0,"meta":56,"cpa":2291.0},"品牌痛點型":{"spend":61971.0,"meta":12,"cpa":5164.0},"知識型":{"spend":263564.0,"meta":57,"cpa":4624.0},"未分類":{"spend":36593.0,"meta":5,"cpa":7319.0}}},"7":{"台北":{"月份型":{"spend":124790.0,"meta":68,"cpa":1835.0},"區域型":{"spend":29371.0,"meta":9,"cpa":3263.0},"案例型":{"spend":24985.0,"meta":5,"cpa":4997.0},"品牌通用型":{"spend":55562.0,"meta":12,"cpa":4630.0},"品牌痛點型":{"spend":48907.0,"meta":9,"cpa":5434.0},"知識型":{"spend":243054.0,"meta":81,"cpa":3001.0},"未分類":{"spend":9499.0,"meta":2,"cpa":4749.0}},"新竹":{"月份型":{"spend":85845.0,"meta":39,"cpa":2201.0},"案例型":{"spend":23059.0,"meta":7,"cpa":3294.0},"品牌通用型":{"spend":79019.0,"meta":43,"cpa":1838.0},"品牌痛點型":{"spend":38638.0,"meta":5,"cpa":7728.0},"知識型":{"spend":52129.0,"meta":15,"cpa":3475.0},"醫師IP":{"spend":1025.0,"meta":0,"cpa":null},"未分類":{"spend":89269.0,"meta":25,"cpa":3571.0}},"高雄":{"月份型":{"spend":165336.0,"meta":59,"cpa":2802.0},"區域型":{"spend":3464.0,"meta":1,"cpa":3464.0},"案例型":{"spend":26380.0,"meta":5,"cpa":5276.0},"品牌通用型":{"spend":97845.0,"meta":44,"cpa":2224.0},"品牌痛點型":{"spend":18874.0,"meta":5,"cpa":3775.0},"知識型":{"spend":350704.0,"meta":80,"cpa":4384.0},"未分類":{"spend":4505.0,"meta":0,"cpa":null}}}};
+const AUDIENCE_SNAPSHOT = {"5":{"台北":{"NU":{"spend":864219.0,"meta":244,"cpa":3542.0},"RT":{"spend":406490.0,"meta":96,"cpa":4234.0},"ASC":{"spend":53468.0,"meta":8,"cpa":6683.0}},"新竹":{"NU":{"spend":522971.0,"meta":261,"cpa":2004.0},"RT":{"spend":221704.0,"meta":73,"cpa":3037.0},"ASC":{"spend":92534.0,"meta":29,"cpa":3191.0}},"高雄":{"NU":{"spend":869431.0,"meta":242,"cpa":3593.0},"RT":{"spend":320744.0,"meta":59,"cpa":5436.0},"ASC":{"spend":128164.0,"meta":21,"cpa":6103.0}}},"6":{"台北":{"NU":{"spend":603317.0,"meta":217,"cpa":2780.0},"RT":{"spend":239805.0,"meta":58,"cpa":4135.0},"ASC":{"spend":76699.0,"meta":26,"cpa":2950.0}},"新竹":{"NU":{"spend":272644.0,"meta":92,"cpa":2964.0},"RT":{"spend":222011.0,"meta":57,"cpa":3895.0},"ASC":{"spend":92666.0,"meta":36,"cpa":2574.0}},"高雄":{"NU":{"spend":570175.0,"meta":155,"cpa":3679.0},"RT":{"spend":224691.0,"meta":58,"cpa":3874.0},"ASC":{"spend":159436.0,"meta":41,"cpa":3889.0}}},"7":{"台北":{"NU":{"spend":383623.0,"meta":138,"cpa":2780.0},"RT":{"spend":100661.0,"meta":30,"cpa":3355.0},"ASC":{"spend":51884.0,"meta":18,"cpa":2882.0}},"新竹":{"NU":{"spend":126400.0,"meta":62,"cpa":2039.0},"RT":{"spend":151354.0,"meta":39,"cpa":3881.0},"ASC":{"spend":91230.0,"meta":33,"cpa":2765.0}},"高雄":{"NU":{"spend":397884.0,"meta":126,"cpa":3158.0},"RT":{"spend":158595.0,"meta":33,"cpa":4806.0},"ASC":{"spend":110629.0,"meta":35,"cpa":3161.0}}}};
+const ANGLE_BY_DOCTOR = {"5":{"台北":{"不指定":{"區域型":{"spend":217217.0,"meta":74,"cpa":2935.0},"品牌痛點型":{"spend":36136.0,"meta":11,"cpa":3285.0},"品牌通用型":{"spend":12975.0,"meta":0,"cpa":null},"月份型":{"spend":250515.0,"meta":93,"cpa":2694.0},"知識型":{"spend":41811.0,"meta":9,"cpa":4646.0}},"不指定/未知":{"案例型":{"spend":13367.0,"meta":6,"cpa":2228.0}},"周建安":{"未分類":{"spend":0.0,"meta":0,"cpa":null},"知識型":{"spend":96409.0,"meta":24,"cpa":4017.0}},"宋晏仁":{"品牌通用型":{"spend":198495.0,"meta":44,"cpa":4511.0},"月份型":{"spend":140092.0,"meta":26,"cpa":5388.0},"未分類":{"spend":25675.0,"meta":1,"cpa":25675.0},"知識型":{"spend":41875.0,"meta":2,"cpa":20938.0}},"王律婷":{"品牌痛點型":{"spend":49995.0,"meta":7,"cpa":7142.0},"月份型":{"spend":2993.0,"meta":0,"cpa":null},"知識型":{"spend":90.0,"meta":0,"cpa":null}},"王律婷(成長)":{"未分類":{"spend":5551.0,"meta":0,"cpa":null}},"許芷瑜":{"品牌痛點型":{"spend":46.0,"meta":0,"cpa":null},"品牌通用型":{"spend":96928.0,"meta":29,"cpa":3342.0}},"陳威龍":{"未分類":{"spend":1656.0,"meta":0,"cpa":null},"知識型":{"spend":92351.0,"meta":25,"cpa":3694.0}}},"新竹":{"不指定":{"區域型":{"spend":62793.0,"meta":28,"cpa":2243.0},"品牌痛點型":{"spend":85125.0,"meta":23,"cpa":3701.0},"品牌通用型":{"spend":2676.0,"meta":0,"cpa":null},"月份型":{"spend":76987.0,"meta":17,"cpa":4529.0},"未分類":{"spend":0.0,"meta":0,"cpa":null},"知識型":{"spend":27910.0,"meta":4,"cpa":6978.0}},"不指定/未知":{"未分類":{"spend":47905.0,"meta":17,"cpa":2818.0},"案例型":{"spend":11453.0,"meta":2,"cpa":5726.0}},"王律婷":{"品牌痛點型":{"spend":50516.0,"meta":31,"cpa":1630.0},"品牌通用型":{"spend":177123.0,"meta":59,"cpa":3002.0},"月份型":{"spend":14936.0,"meta":0,"cpa":null},"未分類":{"spend":10304.0,"meta":9,"cpa":1145.0}},"王律婷(成長)":{"未分類":{"spend":39455.0,"meta":8,"cpa":4932.0}},"陳威龍":{"知識型":{"spend":42007.0,"meta":6,"cpa":7001.0}},"魏士航":{"月份型":{"spend":15181.0,"meta":7,"cpa":2169.0},"未分類":{"spend":125907.0,"meta":54,"cpa":2332.0},"案例型":{"spend":12926.0,"meta":0,"cpa":null},"知識型":{"spend":33974.0,"meta":1,"cpa":33974.0}}},"高雄":{"不指定":{"區域型":{"spend":168748.0,"meta":42,"cpa":4018.0},"品牌痛點型":{"spend":34232.0,"meta":10,"cpa":3423.0},"品牌通用型":{"spend":176295.0,"meta":54,"cpa":3265.0},"月份型":{"spend":162732.0,"meta":54,"cpa":3014.0},"未分類":{"spend":18049.0,"meta":3,"cpa":6016.0},"知識型":{"spend":6056.0,"meta":2,"cpa":3028.0}},"不指定/未知":{"案例型":{"spend":10947.0,"meta":5,"cpa":2189.0}},"劉曜增":{"品牌痛點型":{"spend":56895.0,"meta":14,"cpa":4064.0}},"李唐越":{"品牌痛點型":{"spend":3231.0,"meta":0,"cpa":null},"月份型":{"spend":88353.0,"meta":25,"cpa":3534.0},"未分類":{"spend":14551.0,"meta":0,"cpa":null},"案例型":{"spend":245241.0,"meta":95,"cpa":2581.0},"知識型":{"spend":118234.0,"meta":17,"cpa":6955.0}},"李思賢":{"區域型":{"spend":9386.0,"meta":0,"cpa":null},"未分類":{"spend":36176.0,"meta":3,"cpa":12059.0},"知識型":{"spend":48557.0,"meta":4,"cpa":12139.0}},"范亞萱":{"品牌痛點型":{"spend":69603.0,"meta":9,"cpa":7734.0},"未分類":{"spend":45568.0,"meta":5,"cpa":9114.0},"知識型":{"spend":5486.0,"meta":0,"cpa":null}}}},"6":{"台北":{"不指定":{"區域型":{"spend":29696.0,"meta":11,"cpa":2700.0},"品牌痛點型":{"spend":27329.0,"meta":10,"cpa":2733.0},"月份型":{"spend":195540.0,"meta":78,"cpa":2507.0},"案例型":{"spend":66958.0,"meta":24,"cpa":2790.0},"知識型":{"spend":20103.0,"meta":6,"cpa":3350.0}},"不指定/未知":{"案例型":{"spend":17072.0,"meta":9,"cpa":1897.0}},"周建安":{"知識型":{"spend":59006.0,"meta":28,"cpa":2107.0}},"宋晏仁":{"品牌痛點型":{"spend":36289.0,"meta":10,"cpa":3629.0},"品牌通用型":{"spend":19245.0,"meta":3,"cpa":6415.0},"月份型":{"spend":129046.0,"meta":33,"cpa":3910.0},"未分類":{"spend":13268.0,"meta":2,"cpa":6634.0},"知識型":{"spend":128112.0,"meta":32,"cpa":4004.0}},"王律婷":{"品牌痛點型":{"spend":20667.0,"meta":1,"cpa":20667.0},"未分類":{"spend":2780.0,"meta":3,"cpa":927.0},"知識型":{"spend":410.0,"meta":0,"cpa":null}},"王律婷(成長)":{"未分類":{"spend":13971.0,"meta":2,"cpa":6986.0}},"許芷瑜":{"品牌通用型":{"spend":86880.0,"meta":42,"cpa":2069.0}},"陳威龍":{"未分類":{"spend":78.0,"meta":0,"cpa":null},"知識型":{"spend":53092.0,"meta":13,"cpa":4084.0}}},"新竹":{"不指定":{"品牌痛點型":{"spend":38086.0,"meta":7,"cpa":5441.0},"品牌通用型":{"spend":483.0,"meta":0,"cpa":null},"月份型":{"spend":65395.0,"meta":26,"cpa":2515.0},"案例型":{"spend":73204.0,"meta":35,"cpa":2092.0},"知識型":{"spend":23216.0,"meta":4,"cpa":5804.0}},"不指定/未知":{"未分類":{"spend":12117.0,"meta":3,"cpa":4039.0},"案例型":{"spend":4318.0,"meta":1,"cpa":4318.0}},"王律婷":{"品牌痛點型":{"spend":49624.0,"meta":9,"cpa":5514.0},"品牌通用型":{"spend":100882.0,"meta":21,"cpa":4804.0},"月份型":{"spend":31338.0,"meta":2,"cpa":15669.0},"未分類":{"spend":13640.0,"meta":3,"cpa":4547.0}},"王律婷(成長)":{"未分類":{"spend":35189.0,"meta":3,"cpa":11730.0}},"魏士航":{"月份型":{"spend":49429.0,"meta":18,"cpa":2746.0},"未分類":{"spend":46173.0,"meta":9,"cpa":5130.0},"案例型":{"spend":7431.0,"meta":3,"cpa":2477.0},"知識型":{"spend":36796.0,"meta":11,"cpa":3345.0}}},"高雄":{"不指定":{"區域型":{"spend":9272.0,"meta":0,"cpa":null},"品牌痛點型":{"spend":11001.0,"meta":3,"cpa":3667.0},"品牌通用型":{"spend":113774.0,"meta":55,"cpa":2069.0},"月份型":{"spend":137599.0,"meta":37,"cpa":3719.0},"案例型":{"spend":108952.0,"meta":42,"cpa":2594.0},"知識型":{"spend":19490.0,"meta":6,"cpa":3248.0}},"不指定/未知":{"案例型":{"spend":16920.0,"meta":9,"cpa":1880.0}},"劉曜增":{"品牌痛點型":{"spend":13234.0,"meta":1,"cpa":13234.0},"品牌通用型":{"spend":14529.0,"meta":1,"cpa":14529.0},"知識型":{"spend":7072.0,"meta":2,"cpa":3536.0}},"李唐越":{"品牌痛點型":{"spend":9593.0,"meta":5,"cpa":1919.0},"月份型":{"spend":110012.0,"meta":29,"cpa":3794.0},"未分類":{"spend":1714.0,"meta":0,"cpa":null},"案例型":{"spend":54740.0,"meta":12,"cpa":4562.0},"知識型":{"spend":160690.0,"meta":37,"cpa":4343.0}},"李思賢":{"區域型":{"spend":26374.0,"meta":4,"cpa":6594.0},"未分類":{"spend":3536.0,"meta":1,"cpa":3536.0},"知識型":{"spend":58200.0,"meta":9,"cpa":6467.0}},"范亞萱":{"品牌痛點型":{"spend":28144.0,"meta":3,"cpa":9381.0},"未分類":{"spend":31343.0,"meta":4,"cpa":7836.0},"知識型":{"spend":18112.0,"meta":3,"cpa":6037.0}}}},"7":{"台北":{"不指定":{"區域型":{"spend":38453.0,"meta":13,"cpa":2958.0},"品牌痛點型":{"spend":929.0,"meta":0,"cpa":null},"月份型":{"spend":138618.0,"meta":87,"cpa":1593.0},"案例型":{"spend":17517.0,"meta":6,"cpa":2920.0},"知識型":{"spend":146254.0,"meta":65,"cpa":2250.0}},"不指定/未知":{"未分類":{"spend":129.0,"meta":0,"cpa":null},"案例型":{"spend":12674.0,"meta":10,"cpa":1267.0}},"周建安":{"知識型":{"spend":43459.0,"meta":15,"cpa":2897.0}},"宋晏仁":{"品牌痛點型":{"spend":50251.0,"meta":16,"cpa":3141.0},"品牌通用型":{"spend":32616.0,"meta":2,"cpa":16308.0},"月份型":{"spend":31001.0,"meta":4,"cpa":7750.0},"知識型":{"spend":103359.0,"meta":23,"cpa":4494.0}},"李唐越":{"月份型":{"spend":158.0,"meta":0,"cpa":null},"知識型":{"spend":13096.0,"meta":3,"cpa":4365.0}},"王律婷":{"品牌痛點型":{"spend":12889.0,"meta":0,"cpa":null},"未分類":{"spend":6148.0,"meta":0,"cpa":null},"知識型":{"spend":2539.0,"meta":1,"cpa":2539.0}},"王律婷(成長)":{"未分類":{"spend":7938.0,"meta":2,"cpa":3969.0}},"許芷瑜":{"品牌通用型":{"spend":52175.0,"meta":19,"cpa":2746.0},"未分類":{"spend":543.0,"meta":0,"cpa":null}},"陳威龍":{"未分類":{"spend":29.0,"meta":0,"cpa":null},"知識型":{"spend":36661.0,"meta":9,"cpa":4073.0}},"魏士航":{"未分類":{"spend":558.0,"meta":0,"cpa":null}}},"新竹":{"不指定":{"品牌痛點型":{"spend":14257.0,"meta":2,"cpa":7128.0},"月份型":{"spend":88180.0,"meta":49,"cpa":1800.0},"案例型":{"spend":24296.0,"meta":7,"cpa":3471.0},"知識型":{"spend":61343.0,"meta":19,"cpa":3229.0}},"不指定/未知":{"未分類":{"spend":36858.0,"meta":7,"cpa":5265.0}},"楊德仁":{"品牌痛點型":{"spend":25610.0,"meta":1,"cpa":25610.0},"醫師IP":{"spend":1216.0,"meta":0,"cpa":null}},"王律婷":{"品牌痛點型":{"spend":10037.0,"meta":2,"cpa":5018.0},"品牌通用型":{"spend":121697.0,"meta":35,"cpa":3477.0},"月份型":{"spend":8468.0,"meta":2,"cpa":4234.0},"知識型":{"spend":2121.0,"meta":0,"cpa":null}},"魏士航":{"月份型":{"spend":31035.0,"meta":9,"cpa":3448.0},"未分類":{"spend":75282.0,"meta":25,"cpa":3011.0},"案例型":{"spend":4688.0,"meta":1,"cpa":4688.0},"知識型":{"spend":8313.0,"meta":2,"cpa":4156.0}}},"高雄":{"不指定":{"區域型":{"spend":3675.0,"meta":1,"cpa":3675.0},"品牌痛點型":{"spend":10698.0,"meta":3,"cpa":3566.0},"品牌通用型":{"spend":132178.0,"meta":57,"cpa":2319.0},"月份型":{"spend":150500.0,"meta":62,"cpa":2427.0},"案例型":{"spend":20337.0,"meta":5,"cpa":4067.0},"知識型":{"spend":156060.0,"meta":39,"cpa":4002.0}},"不指定/未知":{"未分類":{"spend":219.0,"meta":0,"cpa":null},"案例型":{"spend":12580.0,"meta":10,"cpa":1258.0}},"劉曜增":{"知識型":{"spend":35768.0,"meta":6,"cpa":5961.0}},"李唐越":{"品牌痛點型":{"spend":5845.0,"meta":1,"cpa":5845.0},"月份型":{"spend":81813.0,"meta":24,"cpa":3409.0},"知識型":{"spend":127010.0,"meta":28,"cpa":4536.0}},"李思賢":{"未分類":{"spend":4913.0,"meta":0,"cpa":null},"知識型":{"spend":95656.0,"meta":26,"cpa":3679.0}},"范亞萱":{"品牌痛點型":{"spend":34149.0,"meta":7,"cpa":4878.0},"知識型":{"spend":23683.0,"meta":1,"cpa":23683.0}},"魏士航":{"未分類":{"spend":728.0,"meta":1,"cpa":728.0}}}},"8":{"台北":{},"新竹":{},"高雄":{}},"9":{"台北":{},"新竹":{},"高雄":{}}};
+const AUDIENCE_DETAIL = {"5":{"台北":[{"name":"NU_宋醫師_ASC","category":"NU","spend":192669.0,"meta":48,"cpa":4014.0},{"name":"RT_PV30D+FPE初日","category":"RT","spend":138928.0,"meta":48,"cpa":2894.0},{"name":"NU_ASC","category":"NU","spend":97454.0,"meta":33,"cpa":2953.0},{"name":"NU_F_身心健康","category":"NU","spend":96240.0,"meta":17,"cpa":5661.0},{"name":"NU_周醫師_ASC","category":"NU","spend":73132.0,"meta":21,"cpa":3482.0},{"name":"NU_威龍醫師_減重相關興趣+CRM LAL1%","category":"NU","spend":69043.0,"meta":17,"cpa":4061.0},{"name":"NU_許醫師_ASC","category":"NU","spend":68835.0,"meta":21,"cpa":3278.0},{"name":"NU_CRM LAL1%","category":"NU","spend":45845.0,"meta":18,"cpa":2547.0},{"name":"NU_王醫師_ASC","category":"NU","spend":39888.0,"meta":7,"cpa":5698.0},{"name":"NU_高奢興趣x健康","category":"NU","spend":36295.0,"meta":19,"cpa":1910.0},{"name":"RT_PV180D_醫師簡介","category":"RT","spend":35009.0,"meta":12,"cpa":2917.0},{"name":"RT_PV30D初日","category":"RT","spend":29945.0,"meta":7,"cpa":4278.0},{"name":"RT_PV180D初日","category":"RT","spend":29657.0,"meta":9,"cpa":3295.0},{"name":"RT_FPE60D初日","category":"RT","spend":28297.0,"meta":6,"cpa":4716.0},{"name":"NU_宋醫師_減重相關興趣+CRM LAL1%","category":"NU","spend":27999.0,"meta":4,"cpa":7000.0}],"新竹":[{"name":"RT_PV30D+FPE初日","category":"RT","spend":140642.0,"meta":35,"cpa":4018.0},{"name":"NU_王醫師_ASC_減重","category":"NU","spend":94570.0,"meta":33,"cpa":2866.0},{"name":"NU_王醫師_ASC_成長","category":"NU","spend":59541.0,"meta":33,"cpa":1804.0},{"name":"NU_科技產業菁英族","category":"NU","spend":48337.0,"meta":7,"cpa":6905.0},{"name":"NU_F_產後媽媽","category":"NU","spend":41804.0,"meta":19,"cpa":2200.0},{"name":"ASC_王醫師","category":"ASC","spend":35481.0,"meta":8,"cpa":4435.0},{"name":"NU_威龍醫師_減重相關興趣+CRM LAL1%","category":"NU","spend":35118.0,"meta":6,"cpa":5853.0},{"name":"ASC_魏醫師","category":"ASC","spend":31672.0,"meta":6,"cpa":5279.0},{"name":"RT_FPE60D初日","category":"RT","spend":31340.0,"meta":6,"cpa":5223.0},{"name":"NU_F_減肥飲食法相關","category":"NU","spend":25461.0,"meta":20,"cpa":1273.0},{"name":"NU_魏醫師_減重相關興趣+CRM LAL1%","category":"NU","spend":23249.0,"meta":2,"cpa":11625.0},{"name":"NU_CRM LAL1%_魏醫師","category":"NU","spend":22076.0,"meta":4,"cpa":5519.0},{"name":"NU_減重相關興趣+CRM LAL1%","category":"NU","spend":21386.0,"meta":12,"cpa":1782.0},{"name":"NU_F_新竹初日周邊3km","category":"NU","spend":20867.0,"meta":29,"cpa":720.0},{"name":"NU_F_精品+健康相關","category":"NU","spend":19601.0,"meta":14,"cpa":1400.0}],"高雄":[{"name":"RT_PV30D+FPE初日","category":"RT","spend":160419.0,"meta":47,"cpa":3413.0},{"name":"NU_李醫師_ASC","category":"NU","spend":134120.0,"meta":41,"cpa":3271.0},{"name":"NU_范醫師_ASC","category":"NU","spend":88291.0,"meta":13,"cpa":6792.0},{"name":"NU_F_身心健康相關","category":"NU","spend":80309.0,"meta":32,"cpa":2510.0},{"name":"ASC_李醫師","category":"ASC","spend":72920.0,"meta":16,"cpa":4557.0},{"name":"NU_ASC","category":"NU","spend":61723.0,"meta":13,"cpa":4748.0},{"name":"NU_F_醫美+健康","category":"NU","spend":59425.0,"meta":23,"cpa":2584.0},{"name":"NU_思思醫師_減重相關興趣+CRM LAL1%","category":"NU","spend":58439.0,"meta":3,"cpa":19480.0},{"name":"NU_F_烘焙興趣","category":"NU","spend":56145.0,"meta":30,"cpa":1871.0},{"name":"NU_F_海上運動相關","category":"NU","spend":41586.0,"meta":20,"cpa":2079.0},{"name":"ASC","category":"ASC","spend":39654.0,"meta":10,"cpa":3965.0},{"name":"NU_劉醫師_減重相關興趣+CRM LAL1%","category":"NU","spend":37261.0,"meta":12,"cpa":3105.0},{"name":"NU_F_比基尼相關","category":"NU","spend":31417.0,"meta":7,"cpa":4488.0},{"name":"NU_F_中大尺碼服飾興趣","category":"NU","spend":23418.0,"meta":15,"cpa":1561.0},{"name":"NU_火鍋x健康","category":"NU","spend":22700.0,"meta":8,"cpa":2838.0}]},"6":{"台北":[{"name":"NU_宋醫師_ASC","category":"NU","spend":118823.0,"meta":29,"cpa":4097.0},{"name":"NU_ASC","category":"NU","spend":105974.0,"meta":39,"cpa":2717.0},{"name":"RT_PV30D+FPE初日","category":"RT","spend":71532.0,"meta":24,"cpa":2981.0},{"name":"NU_CRM LAL1%","category":"NU","spend":52729.0,"meta":18,"cpa":2929.0},{"name":"NU_許醫師_ASC","category":"NU","spend":50690.0,"meta":23,"cpa":2204.0},{"name":"NU_F_健康保健","category":"NU","spend":49110.0,"meta":19,"cpa":2585.0},{"name":"RT_PV180D初日","category":"RT","spend":48839.0,"meta":10,"cpa":4884.0},{"name":"RT_FPE365D_醫師粉專","category":"RT","spend":41712.0,"meta":17,"cpa":2454.0},{"name":"ASC_許醫師","category":"ASC","spend":36190.0,"meta":19,"cpa":1905.0},{"name":"NU_周醫師_ASC","category":"NU","spend":35272.0,"meta":12,"cpa":2939.0},{"name":"NU_F_高階家電x健康","category":"NU","spend":33841.0,"meta":21,"cpa":1611.0},{"name":"NU_威龍醫師_減重相關興趣+CRM LAL1%","category":"NU","spend":30865.0,"meta":7,"cpa":4409.0},{"name":"NU_CRM LAL1%_周醫師","category":"NU","spend":23733.0,"meta":16,"cpa":1483.0},{"name":"ASC_威龍醫師","category":"ASC","spend":22306.0,"meta":6,"cpa":3718.0},{"name":"NU_王醫師_ASC","category":"NU","spend":20336.0,"meta":5,"cpa":4067.0}],"新竹":[{"name":"RT_PV30D+FPE初日","category":"RT","spend":171904.0,"meta":41,"cpa":4193.0},{"name":"NU_王醫師_ASC_成長","category":"NU","spend":87024.0,"meta":14,"cpa":6216.0},{"name":"ASC_王醫師","category":"ASC","spend":53421.0,"meta":12,"cpa":4452.0},{"name":"NU_王醫師_ASC_減重","category":"NU","spend":45911.0,"meta":5,"cpa":9182.0},{"name":"ASC_魏醫師","category":"ASC","spend":39193.0,"meta":13,"cpa":3015.0},{"name":"RT_FPE60D初日","category":"RT","spend":38878.0,"meta":12,"cpa":3240.0},{"name":"NU_CRM LAL1%_魏醫師","category":"NU","spend":20070.0,"meta":3,"cpa":6690.0},{"name":"NU_F_百貨公司","category":"NU","spend":14330.0,"meta":7,"cpa":2047.0},{"name":"NU_科技產業菁英族","category":"NU","spend":11684.0,"meta":5,"cpa":2337.0},{"name":"NU_吃辣興趣","category":"NU","spend":9894.0,"meta":2,"cpa":4947.0},{"name":"NU_F_產後媽媽","category":"NU","spend":8760.0,"meta":5,"cpa":1752.0},{"name":"NU_夜生活x健康","category":"NU","spend":8722.0,"meta":8,"cpa":1090.0},{"name":"NU_F_類似廣告受眾 (TW, 3%) - 診所sb名單","category":"NU","spend":8457.0,"meta":4,"cpa":2114.0},{"name":"NU_F_減肥飲食法相關","category":"NU","spend":6506.0,"meta":2,"cpa":3253.0},{"name":"NU_戶外活動x健康","category":"NU","spend":5837.0,"meta":3,"cpa":1946.0}],"高雄":[{"name":"ASC_李醫師","category":"ASC","spend":116293.0,"meta":34,"cpa":3420.0},{"name":"RT_PV30D+FPE初日","category":"RT","spend":87236.0,"meta":14,"cpa":6231.0},{"name":"NU_吃辣興趣","category":"NU","spend":77504.0,"meta":21,"cpa":3691.0},{"name":"NU_F_中大尺碼服飾興趣","category":"NU","spend":56164.0,"meta":21,"cpa":2674.0},{"name":"NU_思思醫師_減重相關興趣+CRM LAL1%","category":"NU","spend":49866.0,"meta":10,"cpa":4987.0},{"name":"NU_范醫師_ASC","category":"NU","spend":42317.0,"meta":6,"cpa":7053.0},{"name":"NU_美食與社交","category":"NU","spend":39639.0,"meta":13,"cpa":3049.0},{"name":"NU_夜生活興趣","category":"NU","spend":36874.0,"meta":9,"cpa":4097.0},{"name":"NU_F_烘焙興趣","category":"NU","spend":36814.0,"meta":9,"cpa":4090.0},{"name":"NU_李醫師_ASC","category":"NU","spend":36707.0,"meta":5,"cpa":7341.0},{"name":"RT_FPE60D初日","category":"RT","spend":31337.0,"meta":16,"cpa":1959.0},{"name":"RT_FPE365D_醫師粉專","category":"RT","spend":27620.0,"meta":8,"cpa":3453.0},{"name":"RT_FPE60D初日_思思醫師","category":"RT","spend":23966.0,"meta":3,"cpa":7989.0},{"name":"ASC_范醫師","category":"ASC","spend":23809.0,"meta":3,"cpa":7936.0},{"name":"NU_F_夜生活相關","category":"NU","spend":22773.0,"meta":4,"cpa":5693.0}]},"7":{"台北":[{"name":"NU_宋醫師_ASC","category":"NU","spend":105773.0,"meta":11,"cpa":9616.0},{"name":"NU_ASC","category":"NU","spend":101566.0,"meta":42,"cpa":2418.0},{"name":"NU_F_高階家電x健康","category":"NU","spend":70366.0,"meta":46,"cpa":1530.0},{"name":"NU_CRM LAL1%","category":"NU","spend":68841.0,"meta":48,"cpa":1434.0},{"name":"RT_PV30D+FPE初日","category":"RT","spend":65843.0,"meta":24,"cpa":2743.0},{"name":"RT_PV180D初日","category":"RT","spend":42622.0,"meta":15,"cpa":2841.0},{"name":"RT_FPE365D_醫師粉專","category":"RT","spend":33396.0,"meta":5,"cpa":6679.0},{"name":"ASC_許醫師","category":"ASC","spend":26591.0,"meta":15,"cpa":1773.0},{"name":"NU_許醫師_ASC","category":"NU","spend":26127.0,"meta":4,"cpa":6532.0},{"name":"ASC_威龍醫師","category":"ASC","spend":24216.0,"meta":9,"cpa":2691.0},{"name":"NU_周醫師_ASC","category":"NU","spend":22179.0,"meta":7,"cpa":3168.0},{"name":"NU_CRM LAL1%_周醫師","category":"NU","spend":21280.0,"meta":8,"cpa":2660.0},{"name":"NU_外食興趣","category":"NU","spend":16202.0,"meta":9,"cpa":1800.0},{"name":"ASC_王醫師","category":"ASC","spend":15331.0,"meta":1,"cpa":15331.0},{"name":"NU_烘焙食物興趣","category":"NU","spend":14660.0,"meta":3,"cpa":4887.0}],"新竹":[{"name":"RT_PV30D+FPE初日","category":"RT","spend":162425.0,"meta":39,"cpa":4165.0},{"name":"ASC_王醫師","category":"ASC","spend":61897.0,"meta":17,"cpa":3641.0},{"name":"ASC_魏醫師","category":"ASC","spend":54601.0,"meta":21,"cpa":2600.0},{"name":"RT_FPE60D初日","category":"RT","spend":47333.0,"meta":15,"cpa":3156.0},{"name":"NU_王醫師_減重_輕熟齡婦女相關","category":"NU","spend":38937.0,"meta":12,"cpa":3245.0},{"name":"NU_F_奢華旅遊x財富管理x健康","category":"NU","spend":17060.0,"meta":10,"cpa":1706.0},{"name":"NU_王醫師_ASC_成長","category":"NU","spend":14313.0,"meta":4,"cpa":3578.0},{"name":"NU_F_健康保健_魏醫師","category":"NU","spend":13815.0,"meta":1,"cpa":13815.0},{"name":"NU_戶外活動x健康","category":"NU","spend":11329.0,"meta":10,"cpa":1133.0},{"name":"NU_精品x健康","category":"NU","spend":11163.0,"meta":7,"cpa":1595.0},{"name":"ASC_楊醫師","category":"ASC","spend":10699.0,"meta":0,"cpa":null},{"name":"NU_夜生活x健康","category":"NU","spend":9838.0,"meta":11,"cpa":894.0},{"name":"NU_楊醫師_ASC","category":"NU","spend":9673.0,"meta":1,"cpa":9673.0},{"name":"NU_身心健康","category":"NU","spend":9577.0,"meta":2,"cpa":4789.0},{"name":"NU_自信x健康","category":"NU","spend":7871.0,"meta":3,"cpa":2624.0}],"高雄":[{"name":"RT_FPE60D初日","category":"RT","spend":69690.0,"meta":24,"cpa":2904.0},{"name":"ASC_李醫師","category":"ASC","spend":62535.0,"meta":17,"cpa":3679.0},{"name":"RT_PV30D+FPE初日","category":"RT","spend":61945.0,"meta":8,"cpa":7743.0},{"name":"NU_吃辣x健康","category":"NU","spend":58377.0,"meta":30,"cpa":1946.0},{"name":"NU_生活壓力","category":"NU","spend":42708.0,"meta":12,"cpa":3559.0},{"name":"ASC_思思醫師","category":"ASC","spend":36795.0,"meta":19,"cpa":1937.0},{"name":"NU_F_減肥相關","category":"NU","spend":34521.0,"meta":10,"cpa":3452.0},{"name":"RT_PV30D初日","category":"RT","spend":33221.0,"meta":10,"cpa":3322.0},{"name":"NU_F_身心健康相關","category":"NU","spend":31914.0,"meta":12,"cpa":2659.0},{"name":"NU_夜生活興趣","category":"NU","spend":30938.0,"meta":6,"cpa":5156.0},{"name":"NU_減肥相關_李醫師","category":"NU","spend":30858.0,"meta":13,"cpa":2374.0},{"name":"NU_思思醫師_減重相關興趣+CRM LAL1%","category":"NU","spend":30182.0,"meta":3,"cpa":10061.0},{"name":"NU_F_海上運動相關","category":"NU","spend":29607.0,"meta":10,"cpa":2961.0},{"name":"ASC_范醫師","category":"ASC","spend":29173.0,"meta":5,"cpa":5835.0},{"name":"NU_美食與社交","category":"NU","spend":28935.0,"meta":5,"cpa":5787.0}]},"8":{"台北":[],"新竹":[],"高雄":[]},"9":{"台北":[],"新竹":[],"高雄":[]}};
+const OPENING_DATES = {"5":{"台北":"2026/4/15","新竹":"2026/4/15","高雄":"2026/5/2"},"6":{"台北":"2026/5/15","新竹":"2026/5/15","高雄":"2026/6/16"},"7":{"台北":"2026/6/15","新竹":"2026/6/24","高雄":"2026/7/2"},"8":{"台北":"2026/7/15","新竹":"2026/7/15","高雄":"2026/7/15"},"9":{"台北":null,"新竹":null,"高雄":null}};
+const MATERIAL_TOP = {"台北":[{"name":"台北初日_不指定_7月開診_初日_單圖_月份型_260617","doctor":"不指定","angle":"月份型","audience":"NU","spend":98317.0,"meta":61,"cpa":1612.0},{"name":"台北初日_不指定_甲狀腺代謝開關_初日粉專_影片_知識型_260625","doctor":"不指定","angle":"知識型","audience":"NU","spend":48840.0,"meta":16,"cpa":3053.0},{"name":"台北初日_宋醫師_多巴胺的奴隸_宋醫師粉專_影片_知識型_251107","doctor":"宋晏仁","angle":"知識型","audience":"NU","spend":35976.0,"meta":10,"cpa":3598.0},{"name":"台北初日_宋醫師_逆轉疾病找回健康_初日粉專_單圖_知識型_260618","doctor":"宋晏仁","angle":"知識型","audience":"NU","spend":35892.0,"meta":6,"cpa":5982.0},{"name":"台北初日_許醫師_初診流程大公開_台北初日粉專_單圖_品牌通用型_251021","doctor":"許芷瑜","angle":"品牌通用型","audience":"ASC","spend":34755.0,"meta":10,"cpa":3475.0},{"name":"台北初日_不指定_初日診所看診流程_初日粉專_影片_知識型_260703","doctor":"不指定","angle":"知識型","audience":"NU","spend":30733.0,"meta":19,"cpa":1618.0},{"name":"台北初日_不指定_好評回饋新版_初日_單圖_區域型_260320","doctor":"不指定","angle":"區域型","audience":"NU","spend":29371.0,"meta":9,"cpa":3263.0},{"name":"台北初日_宋醫師_7月開診_宋醫師粉專_單圖_月份型_260617","doctor":"宋晏仁","angle":"月份型","audience":"NU","spend":23469.0,"meta":3,"cpa":7823.0},{"name":"台北初日_宋醫師_名醫實踐_宋醫師粉專_單圖_品牌通用型_250731","doctor":"宋晏仁","angle":"品牌通用型","audience":"NU","spend":20309.0,"meta":1,"cpa":20309.0},{"name":"台北初日_威龍醫師_減重診所有用嗎_初日粉專_影片_知識型_250731","doctor":"陳威龍","angle":"知識型","audience":"ASC","spend":16915.0,"meta":2,"cpa":8458.0},{"name":"台北初日_周醫師_脂肪肝有救了_新版_初日粉專_單圖_知識型_260424","doctor":"周建安","angle":"知識型","audience":"NU","spend":16572.0,"meta":6,"cpa":2762.0},{"name":"台北初日_周醫師_脂肪肝有救了_新版_初日粉專_影片_知識型_260424","doctor":"周建安","angle":"知識型","audience":"NU","spend":15958.0,"meta":6,"cpa":2660.0},{"name":"台北初日_宋醫師_別再盲瘦聰明減重_初日粉專_單圖_品牌痛點型_260613","doctor":"宋晏仁","angle":"品牌痛點型","audience":"NU","spend":13268.0,"meta":8,"cpa":1659.0},{"name":"台北初日_宋醫師_熟齡精準控糖_初日粉專_單圖_品牌痛點型_260618","doctor":"宋晏仁","angle":"品牌痛點型","audience":"RT","spend":13137.0,"meta":1,"cpa":13137.0},{"name":"台北初日_不指定_黃皓禹成功案例_初日_影片_案例型_260614","doctor":"不指定","angle":"案例型","audience":"NU","spend":13124.0,"meta":4,"cpa":3281.0},{"name":"台北初日_宋醫師_內臟脂肪藏危機_初日粉專_單圖_品牌痛點型_260618","doctor":"宋晏仁","angle":"品牌痛點型","audience":"NU","spend":11822.0,"meta":0,"cpa":null},{"name":"台北初日_威龍醫師_肌膚不穩定_威龍醫師粉專_影片_知識型_250620","doctor":"陳威龍","angle":"知識型","audience":"ASC","spend":11403.0,"meta":6,"cpa":1901.0},{"name":"台北初日_王醫師_家庭照顧者的健康_初日粉專_單圖_品牌痛點型_251120","doctor":"王律婷","angle":"品牌痛點型","audience":"ASC","spend":10127.0,"meta":0,"cpa":null},{"name":"台北初日_不指定_啤酒肚脂肪肝_初日粉專_影片_知識型_260625","doctor":"不指定","angle":"知識型","audience":"NU","spend":9282.0,"meta":1,"cpa":9282.0},{"name":"台北初日_KOL_鳥屎減重分享_鳥屎粉專_影片_案例型_260611","doctor":null,"angle":"案例型","audience":"RT","spend":8707.0,"meta":0,"cpa":null}],"新竹":[{"name":"新竹初日_王醫師_新竹不只是減重診所_新竹初日粉專_影片_品牌通用型_260226","doctor":"王律婷","angle":"品牌通用型","audience":"ASC","spend":79019.0,"meta":21,"cpa":3763.0},{"name":"新竹初日_不指定_7月開診_初日_單圖_月份型_260617","doctor":"不指定","angle":"月份型","audience":"NU","spend":54630.0,"meta":30,"cpa":1821.0},{"name":"新竹初日_常態單圖_魏醫師_新竹初日開診_魏醫師_240920","doctor":"魏士航","angle":"未分類","audience":"NU","spend":37411.0,"meta":12,"cpa":3118.0},{"name":"新竹初日_常態影片_魏醫師超載壓力_新竹初日_250509","doctor":"魏士航","angle":"未分類","audience":"NU","spend":23352.0,"meta":8,"cpa":2919.0},{"name":"新竹初日_魏醫師_魏醫師7月開診_魏醫師粉專_單圖_月份型_260626","doctor":"魏士航","angle":"月份型","audience":"NU","spend":19862.0,"meta":3,"cpa":6621.0},{"name":"新竹初日_不指定_初日診所看診流程_初日粉專_影片_知識型_260703","doctor":"不指定","angle":"知識型","audience":"RT","spend":19849.0,"meta":6,"cpa":3308.0},{"name":"新竹初日_楊醫師_用對方法才能持久_初日粉專_單圖_品牌痛點型_260701","doctor":"楊德仁","angle":"品牌痛點型","audience":"ASC","spend":19769.0,"meta":0,"cpa":null},{"name":"新竹初日_不指定_甲狀腺代謝開關_初日粉專_影片_知識型_260625","doctor":"不指定","angle":"知識型","audience":"RT","spend":15628.0,"meta":9,"cpa":1736.0},{"name":"新竹初日_不指定_黃皓禹成功案例_初日_影片_案例型_260614","doctor":"不指定","angle":"案例型","audience":"NU","spend":12262.0,"meta":5,"cpa":2452.0},{"name":"新竹初日_常態影片_新竹院所推薦_新竹初日_250523","doctor":null,"angle":"未分類","audience":"NU","spend":10171.0,"meta":0,"cpa":null},{"name":"新竹初日_常態單圖_新竹院所環境_新竹初日_250207","doctor":null,"angle":"未分類","audience":"NU","spend":10042.0,"meta":0,"cpa":null},{"name":"新竹初日_王醫師_7月開診_王醫師粉專_單圖_月份型_260626","doctor":"王律婷","angle":"月份型","audience":"NU","spend":8468.0,"meta":2,"cpa":4234.0},{"name":"新竹初日_王醫師_不只瘦也要舒服輕盈_初日_單圖_品牌痛點型_260429","doctor":"王律婷","angle":"品牌痛點型","audience":"NU","spend":8382.0,"meta":1,"cpa":8382.0},{"name":"新竹初日_常態影片_子秦減重案例_初日_250528","doctor":null,"angle":"未分類","audience":"NU","spend":5272.0,"meta":0,"cpa":null},{"name":"新竹初日_魏醫師_新竹減重指南_新竹初日粉專_影片_知識型_251231","doctor":"魏士航","angle":"知識型","audience":"NU","spend":3992.0,"meta":0,"cpa":null},{"name":"新竹初日_魏醫師_診間產後個案_初日粉專_影片_案例型_260426","doctor":"魏士航","angle":"案例型","audience":"NU","spend":3964.0,"meta":1,"cpa":3964.0},{"name":"新竹初日_不指定_啤酒肚脂肪肝_初日粉專_影片_知識型_260625","doctor":"不指定","angle":"知識型","audience":"RT","spend":3738.0,"meta":0,"cpa":null},{"name":"新竹初日_不指定_林先生患者成效_初日_單圖_案例型_260614","doctor":"不指定","angle":"案例型","audience":"NU","spend":3419.0,"meta":1,"cpa":3419.0},{"name":"新竹初日_不指定_賴小姐好評回饋_初日_單圖_案例型_260606","doctor":"不指定","angle":"案例型","audience":"NU","spend":3127.0,"meta":0,"cpa":null},{"name":"新竹初日_魏醫師_BMI19也脂肪肝_魏醫師粉專_影片_知識型_250620","doctor":"魏士航","angle":"知識型","audience":"NU","spend":3126.0,"meta":0,"cpa":null}],"高雄":[{"name":"高雄初日_不指定_7月開診_初日_單圖_月份型_260617","doctor":"不指定","angle":"月份型","audience":"NU","spend":102792.0,"meta":42,"cpa":2447.0},{"name":"高雄初日_不指定_高雄初日好評_高雄初日粉專_單圖_品牌通用型_250828","doctor":"不指定","angle":"品牌通用型","audience":"NU","spend":97845.0,"meta":44,"cpa":2224.0},{"name":"高雄初日_不指定_初日診所看診流程_初日粉專_影片_知識型_260703","doctor":"不指定","angle":"知識型","audience":"NU","spend":78638.0,"meta":24,"cpa":3277.0},{"name":"高雄初日_思思醫師_梨形身材_高雄初日粉專_影片_知識型_2507116","doctor":"李思賢","angle":"知識型","audience":"ASC","spend":70350.0,"meta":22,"cpa":3198.0},{"name":"高雄初日_李醫師_減重好朋友_李醫師粉專_影片_知識型_251004","doctor":"李唐越","angle":"知識型","audience":"NU","spend":69541.0,"meta":16,"cpa":4346.0},{"name":"高雄初日_李醫師_李醫師7月開診_李醫師粉專_單圖_月份型_260626","doctor":"李唐越","angle":"月份型","audience":"NU","spend":58542.0,"meta":15,"cpa":3903.0},{"name":"高雄初日_劉醫師_越軟的食物越容易胖_初日粉專_影片_知識型_260313","doctor":"劉曜增","angle":"知識型","audience":"ASC","spend":28098.0,"meta":2,"cpa":14049.0},{"name":"高雄初日_不指定_甲狀腺代謝開關_初日粉專_影片_知識型_260625","doctor":"不指定","angle":"知識型","audience":"NU","spend":27863.0,"meta":7,"cpa":3980.0},{"name":"高雄初日_李醫師_打瘦瘦針要知道的三件事_初日粉專_影片_知識型_260108","doctor":"李唐越","angle":"知識型","audience":"NU","spend":16810.0,"meta":6,"cpa":2802.0},{"name":"高雄初日_范醫師_情緒性進食_高雄初日粉專_影片_知識型_250724","doctor":"范亞萱","angle":"知識型","audience":"ASC","spend":12085.0,"meta":0,"cpa":null},{"name":"高雄初日_范醫師_情緒性進食_初日粉專_單圖_知識型_251021","doctor":"范亞萱","angle":"知識型","audience":"NU","spend":11024.0,"meta":1,"cpa":11024.0},{"name":"高雄初日_李醫師_瘦瘦針只是輔助輪_李醫師粉專_影片_知識型_260102","doctor":"李唐越","angle":"知識型","audience":"NU","spend":10197.0,"meta":0,"cpa":null},{"name":"高雄初日_李醫師_餓著入睡_高雄初日粉專_單圖_知識型_250912","doctor":"李唐越","angle":"知識型","audience":"NU","spend":9782.0,"meta":0,"cpa":null},{"name":"高雄初日_KOL_鳥屎減重分享_鳥屎粉專_影片_案例型_260611","doctor":null,"angle":"案例型","audience":"NU","spend":8924.0,"meta":0,"cpa":null},{"name":"高雄初日_不指定_黃皓禹成功案例_初日_影片_案例型_260614","doctor":"不指定","angle":"案例型","audience":"NU","spend":8883.0,"meta":3,"cpa":2961.0},{"name":"高雄初日_不指定_林先生患者成效_初日_單圖_案例型_260614","doctor":"不指定","angle":"案例型","audience":"NU","spend":6862.0,"meta":1,"cpa":6862.0},{"name":"高雄初日_不指定_啤酒肚脂肪肝_初日粉專_影片_知識型_260625","doctor":"不指定","angle":"知識型","audience":"NU","spend":6035.0,"meta":0,"cpa":null},{"name":"高雄初日_李醫師_小腹凸只是排便不順嗎_高雄初日_單圖_品牌痛點型_260328","doctor":"李唐越","angle":"品牌痛點型","audience":"NU","spend":5845.0,"meta":1,"cpa":5845.0},{"name":"高雄初日_范醫師_產後瘦身_高雄初日粉專_單圖_品牌痛點型_250830","doctor":"范亞萱","angle":"品牌痛點型","audience":"ASC","spend":5802.0,"meta":1,"cpa":5802.0},{"name":"高雄初日_常態單圖_思思醫師_思思自介_思思醫師","doctor":"李思賢","angle":"未分類","audience":"NU","spend":4505.0,"meta":0,"cpa":null}]};
+const AD_SNAPSHOT = {"5":{"台北":{"dates":["2026/5/1","2026/5/2","2026/5/3","2026/5/4","2026/5/5","2026/5/6","2026/5/7","2026/5/8","2026/5/9","2026/5/10","2026/5/11","2026/5/12","2026/5/13","2026/5/14","2026/5/15","2026/5/16","2026/5/17","2026/5/18","2026/5/19","2026/5/20","2026/5/21","2026/5/22","2026/5/23","2026/5/24","2026/5/25","2026/5/26","2026/5/27","2026/5/28","2026/5/29","2026/5/30","2026/5/31"],"doctors":{"宋晏仁":{"spend":[30883.0,25613.0,28930.0,25969.0,21217.0,20709.0,14934.0,26788.0,21981.0,24936.0,2923.0,7262.0,8569.0,8343.0,5743.0,7668.0,9962.0,5861.0,8679.0,11593.0,11855.0,11447.0,9396.0,7967.0,7409.0,7987.0,7185.0,6817.0,6239.0,5390.0,5884.0],"meta":[4,6,10,8,2,6,0,4,4,8,0,1,0,0,1,0,1,0,2,1,0,2,1,3,0,1,1,1,1,2,0]},"周建安":{"spend":[5435.0,5452.0,6060.0,7238.0,8413.0,11008.0,10287.0,5094.0,4248.0,4733.0,2633.0,3189.0,1427.0,1254.0,1563.0,1274.0,1348.0,1828.0,2804.0,2074.0,1874.0,1670.0,953.0,0.0,0.0,0.0,760.0,981.0,1024.0,776.0,1008.0],"meta":[2,4,0,4,0,4,4,0,0,2,0,1,0,0,0,0,0,0,0,1,0,2,0,0,0,0,0,0,0,0,0]},"許芷瑜":{"spend":[6312.0,4916.0,6344.0,5798.0,6315.0,7763.0,7753.0,5036.0,4310.0,4727.0,3104.0,3863.0,2522.0,2257.0,2219.0,1384.0,1388.0,1561.0,2002.0,1975.0,1710.0,1620.0,1061.0,0.0,0.0,0.0,1124.0,1697.0,1972.0,2705.0,3536.0],"meta":[2,0,2,2,2,4,4,0,2,0,0,0,0,0,1,1,0,0,1,0,2,1,1,0,0,0,0,0,1,0,2]},"陳威龍":{"spend":[5904.0,5516.0,5981.0,5994.0,6005.0,7318.0,6480.0,7460.0,5974.0,6772.0,2942.0,4892.0,3594.0,2591.0,3715.0,1390.0,0.0,0.0,0.0,0.0,0.0,0.0,610.0,2176.0,2161.0,2685.0,1403.0,702.0,685.0,465.0,592.0],"meta":[4,0,2,0,2,2,0,2,0,0,0,2,0,3,0,2,0,0,0,0,0,0,3,2,0,1,0,0,0,0,0]},"王律婷":{"spend":[906.0,698.0,663.0,4342.0,6124.0,4281.0,2714.0,3585.0,3247.0,3433.0,2568.0,3480.0,1207.0,1148.0,1084.0,1174.0,1103.0,939.0,915.0,1553.0,1775.0,1664.0,1202.0,0.0,0.0,0.0,643.0,905.0,604.0,487.0,636.0],"meta":[0,2,0,0,0,2,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0]},"王律婷(成長)":{"spend":[1409.0,1695.0,1918.0,529.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"meta":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},"不指定":{"spend":[41861.0,36251.0,43531.0,37947.0,31703.0,26142.0,28467.0,26259.0,23959.0,31559.0,2656.0,6440.0,7780.0,8290.0,6516.0,5701.0,7619.0,10593.0,18664.0,18190.0,15502.0,18542.0,15044.0,16465.0,14487.0,15095.0,12014.0,8604.0,9818.0,7048.0,5908.0],"meta":[12,18,10,16,10,6,12,14,12,10,0,3,0,0,0,2,5,4,1,7,7,3,2,6,5,5,6,0,5,1,3]}}},"新竹":{"dates":["2026/5/1","2026/5/2","2026/5/3","2026/5/4","2026/5/5","2026/5/6","2026/5/7","2026/5/8","2026/5/9","2026/5/10","2026/5/11","2026/5/12","2026/5/13","2026/5/14","2026/5/15","2026/5/16","2026/5/17","2026/5/18","2026/5/19","2026/5/20","2026/5/21","2026/5/22","2026/5/23","2026/5/24","2026/5/25","2026/5/26","2026/5/27","2026/5/28","2026/5/29","2026/5/30","2026/5/31"],"doctors":{"魏士航":{"spend":[7540.0,8653.0,10217.0,7567.0,4297.0,5903.0,12382.0,12197.0,12860.0,6729.0,1951.0,3549.0,3258.0,3775.0,3262.0,3091.0,2708.0,3890.0,5639.0,6686.0,6767.0,7372.0,7137.0,5988.0,5538.0,5442.0,4329.0,4459.0,5114.0,4800.0,4886.0],"meta":[4,2,6,8,2,0,4,4,4,2,0,0,1,0,2,0,2,0,1,1,1,4,2,1,0,1,0,0,0,4,4]},"陳威龍":{"spend":[4397.0,6190.0,7630.0,4503.0,5173.0,2837.0,1650.0,1643.0,1271.0,763.0,1791.0,1972.0,912.0,559.0,590.0,126.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"meta":[0,0,0,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},"王律婷":{"spend":[5377.0,8857.0,9713.0,13080.0,10040.0,13593.0,18679.0,17037.0,9266.0,8003.0,3129.0,4041.0,4198.0,3203.0,1678.0,1840.0,3058.0,2710.0,3530.0,8953.0,9217.0,8958.0,9973.0,10379.0,9952.0,9049.0,7848.0,7927.0,11033.0,6883.0,11678.0],"meta":[4,6,6,16,10,4,6,6,2,0,0,0,0,0,0,2,2,0,2,1,6,4,6,3,3,1,1,0,4,1,0]},"王律婷(成長)":{"spend":[3370.0,5430.0,1297.0,220.0,5157.0,1840.0,956.0,1249.0,1094.0,617.0,530.0,1007.0,601.0,355.0,624.0,675.0,1051.0,479.0,0.0,193.0,354.0,370.0,183.0,1127.0,1949.0,2036.0,1100.0,871.0,1583.0,1265.0,1873.0],"meta":[0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,1,0,0,2,1,0,0,2]},"不指定":{"spend":[5180.0,7570.0,8607.0,9043.0,9087.0,10677.0,12679.0,14034.0,14320.0,10251.0,2028.0,3573.0,3827.0,3322.0,3174.0,3372.0,5564.0,3710.0,12728.0,9459.0,8046.0,8331.0,9124.0,13500.0,11382.0,10529.0,10079.0,10104.0,7914.0,6296.0,7980.0],"meta":[8,4,0,4,2,4,0,10,2,6,0,0,1,0,1,0,1,0,2,5,1,2,1,2,0,4,2,0,3,1,0]}}},"高雄":{"dates":["2026/5/1","2026/5/2","2026/5/3","2026/5/4","2026/5/5","2026/5/6","2026/5/7","2026/5/8","2026/5/9","2026/5/10","2026/5/11","2026/5/12","2026/5/13","2026/5/14","2026/5/15","2026/5/16","2026/5/17","2026/5/18","2026/5/19","2026/5/20","2026/5/21","2026/5/22","2026/5/23","2026/5/24","2026/5/25","2026/5/26","2026/5/27","2026/5/28","2026/5/29","2026/5/30","2026/5/31"],"doctors":{"李唐越":{"spend":[27937.0,38323.0,38511.0,26400.0,22803.0,28503.0,23880.0,36129.0,30537.0,31731.0,4083.0,5922.0,5344.0,3196.0,3313.0,4718.0,8179.0,3584.0,5184.0,9114.0,9150.0,11430.0,11239.0,9845.0,9391.0,8457.0,8537.0,11531.0,11119.0,9585.0,11934.0],"meta":[12,18,6,12,10,8,4,12,12,6,0,0,0,1,0,2,1,1,0,3,5,3,3,3,0,1,1,1,3,2,3]},"李思賢":{"spend":[0.0,0.0,0.0,0.0,0.0,5980.0,6057.0,12654.0,12723.0,7346.0,3393.0,4708.0,1131.0,753.0,884.0,801.0,1226.0,801.0,1269.0,3545.0,3112.0,3305.0,2820.0,3278.0,2980.0,2838.0,3361.0,3516.0,2536.0,1497.0,1606.0],"meta":[0,0,0,0,0,0,0,0,0,2,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,1,1,1,0]},"范亞萱":{"spend":[8220.0,8117.0,8628.0,5697.0,5983.0,10627.0,9033.0,8791.0,8197.0,3603.0,3902.0,5202.0,3849.0,2207.0,2358.0,1332.0,1402.0,339.0,570.0,2664.0,2885.0,2288.0,1520.0,0.0,7.0,0.0,838.0,1693.0,3486.0,3477.0,3739.0],"meta":[0,2,2,0,2,2,2,0,0,2,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0]},"劉曜增":{"spend":[2123.0,2363.0,2733.0,4257.0,4700.0,8587.0,7638.0,4866.0,4037.0,1814.0,3393.0,3978.0,2251.0,1228.0,1510.0,329.0,0.0,257.0,623.0,207.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"meta":[2,0,0,0,2,4,0,2,2,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},"不指定":{"spend":[27623.0,38930.0,39894.0,30803.0,28313.0,23797.0,18105.0,26375.0,26838.0,24189.0,7869.0,10889.0,10499.0,7295.0,8303.0,9202.0,11048.0,11308.0,19175.0,18749.0,21760.0,19246.0,15814.0,18887.0,18711.0,16568.0,12831.0,9232.0,11911.0,10424.0,11522.0],"meta":[12,6,6,12,10,14,10,8,6,8,0,0,2,1,0,2,1,0,0,9,6,11,2,7,5,3,2,3,1,2,2]}}}},"6":{"台北":{"dates":["2026/6/1","2026/6/2","2026/6/3","2026/6/4","2026/6/5","2026/6/6","2026/6/7","2026/6/8","2026/6/9","2026/6/10","2026/6/11","2026/6/12","2026/6/13","2026/6/14","2026/6/15","2026/6/16","2026/6/17","2026/6/18","2026/6/19","2026/6/20","2026/6/21","2026/6/22","2026/6/23","2026/6/24","2026/6/25","2026/6/26","2026/6/27","2026/6/28","2026/6/29","2026/6/30"],"doctors":{"宋晏仁":{"spend":[9488.0,7556.0,4841.0,10739.0,11718.0,11194.0,14620.0,12615.0,11916.0,14620.0,13936.0,11319.0,15574.0,15037.0,16198.0,14294.0,12024.0,11845.0,9540.0,7104.0,7420.0,6899.0,7795.0,9525.0,8235.0,9156.0,8955.0,10502.0,10373.0,10923.0],"meta":[1,3,0,4,0,0,2,3,3,3,0,3,4,4,4,5,2,8,0,2,3,1,1,1,0,4,3,4,5,5]},"周建安":{"spend":[1412.0,1120.0,506.0,1098.0,1063.0,1195.0,2443.0,1892.0,2183.0,3943.0,4098.0,3012.0,3570.0,3698.0,3381.0,3271.0,1304.0,1318.0,1646.0,1242.0,1907.0,1533.0,1649.0,1833.0,1760.0,1663.0,1166.0,1462.0,1332.0,1306.0],"meta":[1,0,0,0,0,1,1,1,1,1,2,2,1,3,3,1,0,0,1,0,0,1,0,0,4,2,1,0,0,1]},"許芷瑜":{"spend":[3810.0,2616.0,1157.0,2237.0,2360.0,2882.0,7924.0,6097.0,5766.0,5388.0,4280.0,2973.0,3441.0,3336.0,2915.0,2861.0,1455.0,1429.0,1601.0,1132.0,1962.0,1635.0,2009.0,2472.0,2487.0,2151.0,1979.0,2454.0,1974.0,2096.0],"meta":[2,1,0,1,0,1,2,1,1,3,0,3,0,2,2,1,0,0,3,1,1,1,2,2,3,1,1,2,2,1]},"陳威龍":{"spend":[860.0,636.0,221.0,492.0,574.0,870.0,5368.0,5671.0,5163.0,4797.0,4237.0,3024.0,3127.0,1124.0,1134.0,1720.0,1396.0,1479.0,1866.0,1590.0,1923.0,1624.0,1012.0,627.0,486.0,552.0,363.0,439.0,413.0,383.0],"meta":[0,0,0,0,1,1,0,0,1,1,1,0,0,0,1,1,0,0,0,1,0,1,0,1,0,1,0,0,0,0]},"王律婷":{"spend":[809.0,709.0,254.0,526.0,509.0,614.0,2376.0,1277.0,944.0,1335.0,852.0,600.0,613.0,721.0,812.0,758.0,532.0,455.0,437.0,307.0,580.0,597.0,644.0,663.0,733.0,613.0,833.0,1304.0,1140.0,1309.0],"meta":[0,0,0,0,0,0,1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,1,0]},"王律婷(成長)":{"spend":[0.0,0.0,0.0,0.0,0.0,0.0,347.0,1026.0,869.0,969.0,1185.0,841.0,1080.0,381.0,425.0,617.0,329.0,311.0,399.0,266.0,416.0,261.0,259.0,643.0,411.0,490.0,581.0,606.0,675.0,582.0],"meta":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0]},"不指定":{"spend":[14305.0,11169.0,7993.0,14337.0,19755.0,16248.0,16600.0,12696.0,13315.0,14769.0,13469.0,9513.0,12928.0,13499.0,13946.0,13370.0,9464.0,9262.0,9576.0,8420.0,9210.0,8560.0,8453.0,8197.0,8511.0,7766.0,7241.0,8816.0,9723.0,8515.0],"meta":[6,5,5,2,6,6,9,5,1,4,6,3,7,6,2,5,5,3,3,3,9,4,2,3,5,1,1,3,3,4]}}},"新竹":{"dates":["2026/6/1","2026/6/2","2026/6/3","2026/6/4","2026/6/5","2026/6/6","2026/6/7","2026/6/8","2026/6/9","2026/6/10","2026/6/11","2026/6/12","2026/6/13","2026/6/14","2026/6/15","2026/6/16","2026/6/17","2026/6/18","2026/6/19","2026/6/20","2026/6/21","2026/6/22","2026/6/23","2026/6/24","2026/6/25","2026/6/26","2026/6/27","2026/6/28","2026/6/29","2026/6/30"],"doctors":{"魏士航":{"spend":[4295.0,3449.0,1406.0,1819.0,2374.0,2340.0,3291.0,3181.0,6224.0,5629.0,7837.0,6206.0,6283.0,4395.0,4473.0,3951.0,4489.0,4406.0,4418.0,3533.0,3758.0,3010.0,3315.0,3546.0,3099.0,3027.0,6366.0,9567.0,9966.0,10177.0],"meta":[0,3,2,0,0,2,3,0,3,2,0,1,4,3,1,0,0,0,1,0,0,0,1,2,2,1,1,3,4,2]},"王律婷":{"spend":[6584.0,5089.0,3860.0,3989.0,6240.0,7150.0,7367.0,7966.0,8027.0,6456.0,7673.0,6331.0,7039.0,7167.0,6547.0,6177.0,7171.0,6522.0,7327.0,6191.0,5137.0,4464.0,6152.0,8030.0,7506.0,6379.0,5483.0,7970.0,6876.0,6616.0],"meta":[0,0,0,0,2,0,3,3,0,2,3,0,1,0,3,2,1,0,1,0,3,0,0,1,1,3,1,2,1,0]},"王律婷(成長)":{"spend":[1580.0,1421.0,1643.0,2090.0,3607.0,6016.0,7301.0,4667.0,5110.0,1753.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"meta":[0,1,0,0,2,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},"不指定":{"spend":[5757.0,5019.0,3850.0,4453.0,5684.0,6706.0,12159.0,10770.0,10529.0,6312.0,4267.0,3777.0,5631.0,5871.0,6012.0,4089.0,5664.0,5724.0,6329.0,4739.0,4493.0,3990.0,5921.0,8263.0,7081.0,8387.0,8553.0,9828.0,10121.0,10410.0],"meta":[0,1,2,4,1,1,3,4,3,1,3,2,3,0,0,4,2,1,1,3,2,5,1,2,4,3,3,2,1,5]}}},"高雄":{"dates":["2026/6/1","2026/6/2","2026/6/3","2026/6/4","2026/6/5","2026/6/6","2026/6/7","2026/6/8","2026/6/9","2026/6/10","2026/6/11","2026/6/12","2026/6/13","2026/6/14","2026/6/15","2026/6/16","2026/6/17","2026/6/18","2026/6/19","2026/6/20","2026/6/21","2026/6/22","2026/6/23","2026/6/24","2026/6/25","2026/6/26","2026/6/27","2026/6/28","2026/6/29","2026/6/30"],"doctors":{"李唐越":{"spend":[12709.0,13075.0,6853.0,6876.0,12614.0,18201.0,18914.0,17890.0,16759.0,15792.0,16872.0,10716.0,17638.0,12565.0,13688.0,11219.0,9873.0,9050.0,8703.0,7293.0,8739.0,7056.0,7987.0,9237.0,8139.0,7518.0,7360.0,7935.0,8574.0,6904.0],"meta":[9,2,1,1,5,4,1,2,7,1,6,2,2,3,3,3,1,0,2,3,2,2,1,1,2,6,1,3,1,2]},"李思賢":{"spend":[3079.0,2061.0,1300.0,1573.0,1723.0,2584.0,5084.0,5151.0,4653.0,4354.0,4129.0,3053.0,3934.0,3082.0,2758.0,2175.0,2705.0,2788.0,3486.0,2545.0,3435.0,2946.0,2714.0,2572.0,2516.0,2514.0,2253.0,2715.0,2691.0,1537.0],"meta":[0,0,0,2,0,0,1,0,0,1,0,0,1,2,0,1,1,0,1,0,0,0,0,1,1,0,0,1,0,0]},"范亞萱":{"spend":[4769.0,4716.0,2796.0,2860.0,3020.0,2584.0,2054.0,1916.0,2331.0,3155.0,4501.0,3195.0,5711.0,4535.0,4761.0,4285.0,2130.0,2154.0,1657.0,1748.0,1775.0,1272.0,1283.0,836.0,721.0,639.0,1061.0,1756.0,1656.0,1721.0],"meta":[0,1,0,0,0,2,0,0,0,0,2,0,0,1,0,0,0,2,0,0,0,1,0,1,0,0,0,0,0,0]},"劉曜增":{"spend":[0.0,0.0,0.0,0.0,0.0,583.0,1906.0,2131.0,2443.0,2167.0,2021.0,2035.0,2291.0,2410.0,2447.0,1930.0,1222.0,1292.0,1114.0,717.0,1153.0,1323.0,908.0,834.0,631.0,696.0,480.0,693.0,682.0,726.0],"meta":[0,0,0,0,0,0,0,0,0,0,0,1,0,1,0,0,0,0,0,0,0,0,0,2,0,0,0,0,0,0]},"不指定":{"spend":[18035.0,16321.0,10411.0,12243.0,11456.0,10456.0,16070.0,12664.0,14041.0,14843.0,11578.0,10142.0,12892.0,16279.0,16064.0,15342.0,15971.0,16299.0,17670.0,13345.0,15748.0,13773.0,13390.0,12586.0,11601.0,10740.0,9379.0,11155.0,11171.0,8423.0],"meta":[1,3,4,3,4,2,12,8,3,5,5,5,5,8,5,8,4,2,3,3,4,6,7,2,5,6,4,6,5,5]}}}},"7":{"台北":{"dates":["2026/7/1","2026/7/2","2026/7/3","2026/7/4","2026/7/5","2026/7/6","2026/7/7","2026/7/8","2026/7/9","2026/7/10","2026/7/11","2026/7/12","2026/7/13","2026/7/14","2026/7/15","2026/7/16","2026/7/17","2026/7/18","2026/7/19","2026/7/20","2026/7/21","2026/7/22","2026/7/23"],"doctors":{"宋晏仁":{"spend":[12718.0,11390.0,11065.0,11094.0,12472.0,11709.0,11591.0,10964.0,9929.0,8126.0,7379.0,8069.0,7666.0,7086.0,7525.0,5979.0,6083.0,7187.0,9443.0,9732.0,10499.0,10533.0,8987.0],"meta":[2,3,2,3,3,3,3,2,0,0,0,2,1,1,4,1,0,3,1,2,2,4,2]},"李唐越":{"spend":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,583.0,986.0,994.0,1058.0,2029.0,2005.0,2213.0,1617.0,1121.0,649.0,0.0,0.0,0.0],"meta":[0,0,0,0,0,0,0,0,0,0,0,1,0,0,1,1,0,0,0,0,0,0,0]},"周建安":{"spend":[2249.0,3370.0,3266.0,2380.0,2106.0,1957.0,2086.0,1899.0,1655.0,1832.0,1443.0,1775.0,1515.0,1473.0,1904.0,1621.0,1700.0,1424.0,1728.0,1602.0,1771.0,1466.0,1239.0],"meta":[0,2,2,0,1,1,0,0,1,3,0,0,1,1,0,0,1,0,1,0,0,0,1]},"許芷瑜":{"spend":[2625.0,3520.0,3331.0,2446.0,2334.0,1936.0,2054.0,1828.0,1739.0,1783.0,1684.0,2304.0,1963.0,1886.0,1841.0,1481.0,1637.0,1792.0,3192.0,2882.0,3343.0,2887.0,2231.0],"meta":[0,1,1,1,1,2,2,0,0,0,1,0,0,1,0,0,1,1,2,2,1,0,2]},"魏士航":{"spend":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,450.0,32.0,77.0],"meta":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},"陳威龍":{"spend":[796.0,1811.0,1670.0,1319.0,1410.0,1502.0,1457.0,1352.0,1202.0,3171.0,2821.0,2205.0,1956.0,1864.0,2044.0,1894.0,2044.0,1359.0,684.0,524.0,1083.0,1306.0,1215.0],"meta":[0,1,1,0,2,0,0,2,0,0,0,0,0,1,1,0,0,0,0,1,0,0,0]},"王律婷":{"spend":[1176.0,960.0,1008.0,796.0,1142.0,1013.0,859.0,613.0,600.0,695.0,691.0,1126.0,1077.0,1037.0,987.0,753.0,827.0,870.0,1482.0,1313.0,1061.0,856.0,634.0],"meta":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0]},"王律婷(成長)":{"spend":[378.0,225.0,119.0,136.0,168.0,348.0,333.0,494.0,382.0,382.0,474.0,586.0,448.0,296.0,252.0,106.0,64.0,158.0,291.0,596.0,648.0,613.0,440.0],"meta":[0,0,0,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,1,0,0,0]},"不指定":{"spend":[13397.0,15266.0,15677.0,15020.0,20951.0,19576.0,19699.0,17898.0,15797.0,17438.0,11823.0,13568.0,11972.0,11143.0,16398.0,13823.0,13909.0,13101.0,14048.0,14170.0,14636.0,11782.0,10679.0],"meta":[10,8,6,7,9,12,5,7,7,5,10,7,5,6,8,8,11,5,5,5,8,8,8]}}},"新竹":{"dates":["2026/7/1","2026/7/2","2026/7/3","2026/7/4","2026/7/5","2026/7/6","2026/7/7","2026/7/8","2026/7/9","2026/7/10","2026/7/11","2026/7/12","2026/7/13","2026/7/14","2026/7/15","2026/7/16","2026/7/17","2026/7/18","2026/7/19","2026/7/20","2026/7/21","2026/7/22","2026/7/23"],"doctors":{"魏士航":{"spend":[8711.0,8550.0,7816.0,6982.0,7655.0,7316.0,7497.0,7340.0,6917.0,5575.0,3852.0,4675.0,4506.0,3768.0,2906.0,2059.0,2874.0,2502.0,3268.0,3168.0,5036.0,3200.0,3143.0],"meta":[4,1,1,4,2,1,2,0,4,2,1,0,1,0,2,0,1,0,4,2,1,1,1]},"王律婷":{"spend":[6787.0,5638.0,5621.0,5387.0,6164.0,5849.0,6410.0,6385.0,6358.0,5873.0,5263.0,5873.0,5428.0,5135.0,7976.0,6885.0,6780.0,5579.0,6597.0,6642.0,7359.0,5789.0,6544.0],"meta":[1,3,2,2,2,0,2,1,1,2,1,2,1,1,2,1,2,1,1,4,1,2,2]},"楊德仁":{"spend":[386.0,1923.0,2126.0,1878.0,2060.0,1943.0,1615.0,1213.0,1181.0,985.0,720.0,1041.0,922.0,849.0,1283.0,1047.0,1232.0,864.0,737.0,747.0,675.0,659.0,741.0],"meta":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},"不指定":{"spend":[10898.0,9048.0,7250.0,7691.0,7706.0,8212.0,8126.0,8227.0,6881.0,6847.0,6680.0,8769.0,8303.0,7039.0,8810.0,8682.0,9879.0,8058.0,9688.0,8423.0,7632.0,6714.0,8511.0],"meta":[3,2,2,4,3,5,3,5,3,4,4,3,2,3,4,4,6,3,3,2,1,3,2]}}},"高雄":{"dates":["2026/7/1","2026/7/2","2026/7/3","2026/7/4","2026/7/5","2026/7/6","2026/7/7","2026/7/8","2026/7/9","2026/7/10","2026/7/11","2026/7/12","2026/7/13","2026/7/14","2026/7/15","2026/7/16","2026/7/17","2026/7/18","2026/7/19","2026/7/20","2026/7/21","2026/7/22","2026/7/23"],"doctors":{"李唐越":{"spend":[11133.0,13577.0,12478.0,12119.0,13704.0,13114.0,13572.0,12008.0,11106.0,11134.0,9492.0,9643.0,10019.0,9267.0,7104.0,4610.0,5359.0,4450.0,5945.0,5963.0,6773.0,5994.0,6103.0],"meta":[2,2,6,4,1,1,3,1,4,0,2,5,3,0,2,3,1,2,3,2,3,0,2]},"魏士航":{"spend":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,568.0,49.0,111.0],"meta":[0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0]},"李思賢":{"spend":[3390.0,3604.0,4015.0,4356.0,6067.0,5677.0,5919.0,6941.0,5757.0,5662.0,4070.0,4651.0,3885.0,3391.0,4695.0,3712.0,3179.0,2525.0,4669.0,3542.0,4041.0,3090.0,3731.0],"meta":[0,1,3,2,2,1,2,1,2,0,2,0,1,1,1,3,0,0,0,1,1,0,2]},"范亞萱":{"spend":[1743.0,2475.0,2407.0,1744.0,1989.0,2176.0,2310.0,2277.0,2026.0,1973.0,1495.0,1394.0,1415.0,1062.0,1343.0,1078.0,1907.0,3025.0,5320.0,5490.0,4749.0,4381.0,4049.0],"meta":[0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,1,2,2,0,0,0,1]},"劉曜增":{"spend":[1402.0,2168.0,2146.0,2200.0,2307.0,2100.0,2302.0,2036.0,2030.0,1960.0,1493.0,1290.0,1253.0,1104.0,1244.0,1062.0,1079.0,1057.0,1155.0,1403.0,1096.0,999.0,881.0],"meta":[0,1,0,0,0,0,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1,0]},"不指定":{"spend":[17452.0,21998.0,21924.0,21680.0,23856.0,23438.0,23658.0,22310.0,22094.0,21369.0,20726.0,23022.0,23988.0,21384.0,22342.0,19956.0,21406.0,19048.0,16652.0,16189.0,17601.0,16874.0,14482.0],"meta":[8,7,11,7,8,10,8,11,7,8,6,6,5,10,11,5,6,4,4,7,7,5,5]}}}},"8":{"台北":{"dates":[],"doctors":{}},"新竹":{"dates":[],"doctors":{}},"高雄":{"dates":[],"doctors":{}}},"9":{"台北":{"dates":[],"doctors":{}},"新竹":{"dates":[],"doctors":{}},"高雄":{"dates":[],"doctors":{}}}};
+const AD_BENCHMARK = {"台北":{"宋晏仁":{"baseline_spend":331812.0,"cpa_median":4179.0},"周建安":{"baseline_spend":88974.0,"cpa_median":2372.0},"許芷瑜":{"baseline_spend":95764.0,"cpa_median":3463.0},"陳威龍":{"baseline_spend":73025.0,"cpa_median":3760.0},"王律婷":{"baseline_spend":26495.0,"cpa_median":5964.0},"王律婷(成長)":{"baseline_spend":13535.0,"cpa_median":4371.0},"不指定":{"baseline_spend":474477.0,"cpa_median":2674.0}},"新竹":{"魏士航":{"baseline_spend":137502.0,"cpa_median":3133.0},"陳威龍":{"baseline_spend":37340.0,"cpa_median":14586.0},"王律婷":{"baseline_spend":173102.0,"cpa_median":2634.0},"王律婷(成長)":{"baseline_spend":34378.0,"cpa_median":4932.0},"不指定":{"baseline_spend":220858.0,"cpa_median":2991.0}},"高雄":{"李唐越":{"baseline_spend":398933.0,"cpa_median":3531.0},"李思賢":{"baseline_spend":83018.0,"cpa_median":6778.0},"范亞萱":{"baseline_spend":111381.0,"cpa_median":7760.0},"劉曜增":{"baseline_spend":51914.0,"cpa_median":4377.0},"不指定":{"baseline_spend":533105.0,"cpa_median":2865.0}}};
+const SNAPSHOT_DATE = '2026-07-24';
+const SNAPSHOT = {"5":{"台北":{"dates":["2026/5/1","2026/5/2","2026/5/3","2026/5/4","2026/5/5","2026/5/6","2026/5/7","2026/5/8","2026/5/9","2026/5/10","2026/5/11","2026/5/12","2026/5/13","2026/5/14","2026/5/15","2026/5/16","2026/5/17","2026/5/18","2026/5/19","2026/5/20","2026/5/21","2026/5/22","2026/5/23","2026/5/24","2026/5/25","2026/5/26","2026/5/27","2026/5/28","2026/5/29","2026/5/30","2026/5/31"],"doctors":{"宋晏仁":{"booked":[16.0,22.0,21.0,23.0,24.0,24.0,25.0,28.0,30.0,32.0,36.0,37.0,40.0,40.0,44.0,44.0,45.0,49.0,50.0,49.0,54.0,52.0,53.0,54.0,57.0,58.0,59.0,60.0,60.0,60.0,60.0],"unspec":[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[76.0,76.0,76.0,76.0,76.0,76.0,76.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,79.0,78.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0]},"鄧雯心":{"booked":[60.0,60.0,61.0,61.0,59.0,64.0,64.0,65.0,64.0,65.0,66.0,66.0,67.0,67.0,68.0,67.0,68.0,68.0,69.0,69.0,69.0,68.0,69.0,69.0,69.0,68.0,69.0,69.0,69.0,69.0,69.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[70.0,70.0,70.0,70.0,70.0,70.0,70.0,70.0,70.0,70.0,70.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0]},"王律婷":{"booked":[1.0,1.0,3.0,3.0,1.0,1.0,1.0,2.0,2.0,2.0,2.0,2.0,2.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0,1.0,2.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0],"total":[15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0]},"王律婷(成長)":{"booked":[5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,5.0,5.0,6.0,6.0,6.0,6.0,4.0,4.0,3.0,3.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0]},"李唐越":{"booked":[5.0,5.0,6.0,6.0,7.0,7.0,9.0,10.0,12.0,12.0,13.0,13.0,13.0,14.0,15.0,14.0,14.0,14.0,15.0,14.0,13.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0],"total":[24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0]},"周建安":{"booked":[14.0,19.0,21.0,23.0,29.0,30.0,33.0,40.0,46.0,47.0,49.0,49.0,49.0,54.0,52.0,55.0,56.0,56.0,58.0,61.0,66.0,69.0,71.0,70.0,72.0,73.0,75.0,76.0,76.0,75.0,75.0],"unspec":[5.0,9.0,12.0,14.0,17.0,18.0,19.0,25.0,29.0,31.0,33.0,34.0,34.0,39.0,36.0,39.0,39.0,39.0,41.0,43.0,48.0,50.0,51.0,50.0,51.0,52.0,54.0,55.0,55.0,54.0,54.0],"total":[109.0,109.0,109.0,109.0,109.0,109.0,109.0,116.0,115.0,115.0,115.0,132.0,132.0,133.0,133.0,133.0,133.0,133.0,133.0,133.0,132.0,134.0,134.0,134.0,134.0,134.0,137.0,137.0,137.0,137.0,137.0]},"許芷瑜":{"booked":[28.0,30.0,29.0,32.0,34.0,37.0,41.0,42.0,41.0,41.0,41.0,41.0,42.0,44.0,44.0,45.0,43.0,43.0,41.0,41.0,41.0,40.0,39.0,39.0,40.0,43.0,42.0,42.0,44.0,44.0,44.0],"unspec":[18.0,18.0,18.0,20.0,22.0,22.0,23.0,24.0,23.0,23.0,23.0,23.0,24.0,25.0,25.0,25.0,25.0,25.0,25.0,26.0,26.0,26.0,25.0,25.0,26.0,28.0,27.0,27.0,28.0,28.0,28.0],"total":[63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0]},"魏士航":{"booked":[3.0,6.0,5.0,4.0,3.0,4.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,4.0,7.0,7.0,7.0,7.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0],"unspec":[3.0,4.0,4.0,3.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0],"total":[14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0]},"陳威龍":{"booked":[29.0,38.0,38.0,40.0,46.0,47.0,46.0,51.0,52.0,55.0,60.0,59.0,62.0,61.0,67.0,65.0,67.0,70.0,73.0,77.0,78.0,79.0,81.0,82.0,84.0,80.0,83.0,83.0,83.0,82.0,82.0],"unspec":[25.0,31.0,30.0,30.0,33.0,35.0,34.0,38.0,39.0,42.0,46.0,46.0,48.0,48.0,55.0,52.0,54.0,57.0,60.0,62.0,63.0,64.0,64.0,63.0,65.0,62.0,63.0,63.0,63.0,62.0,62.0],"total":[127.0,127.0,127.0,127.0,127.0,127.0,127.0,127.0,127.0,127.0,126.0,127.0,127.0,127.0,127.0,127.0,127.0,127.0,127.0,127.0,127.0,126.0,127.0,127.0,127.0,127.0,127.0,127.0,127.0,127.0,127.0]}}},"新竹":{"dates":["2026/5/1","2026/5/2","2026/5/3","2026/5/4","2026/5/5","2026/5/6","2026/5/7","2026/5/8","2026/5/9","2026/5/10","2026/5/11","2026/5/12","2026/5/13","2026/5/14","2026/5/15","2026/5/16","2026/5/17","2026/5/18","2026/5/19","2026/5/20","2026/5/21","2026/5/22","2026/5/23","2026/5/24","2026/5/25","2026/5/26","2026/5/27","2026/5/28","2026/5/29","2026/5/30","2026/5/31"],"doctors":{"魏士航":{"booked":[17.0,20.0,23.0,27.0,30.0,28.0,30.0,32.0,34.0,35.0,36.0,37.0,38.0,39.0,40.0,41.0,43.0,46.0,49.0,48.0,49.0,51.0,55.0,57.0,60.0,58.0,59.0,59.0,59.0,59.0,59.0],"unspec":[5.0,7.0,10.0,11.0,10.0,10.0,12.0,12.0,12.0,12.0,13.0,14.0,14.0,14.0,15.0,16.0,18.0,20.0,22.0,22.0,22.0,23.0,24.0,25.0,26.0,24.0,25.0,25.0,25.0,25.0,25.0],"total":[78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,82.0,82.0,82.0,82.0,82.0,83.0,83.0,83.0,83.0,83.0,83.0]},"陳威龍":{"booked":[2.0,2.0,2.0,2.0,2.0,3.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0],"unspec":[1.0,1.0,1.0,1.0,1.0,1.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0],"total":[18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0,18.0]},"王律婷":{"booked":[20.0,23.0,25.0,26.0,29.0,29.0,30.0,31.0,30.0,32.0,32.0,32.0,33.0,32.0,32.0,35.0,39.0,37.0,37.0,41.0,41.0,43.0,40.0,39.0,41.0,41.0,40.0,39.0,40.0,40.0,40.0],"unspec":[10.0,10.0,11.0,12.0,12.0,12.0,12.0,11.0,11.0,11.0,11.0,11.0,12.0,12.0,12.0,14.0,17.0,15.0,16.0,20.0,20.0,20.0,18.0,17.0,17.0,17.0,17.0,17.0,17.0,17.0,17.0],"total":[96.0,96.0,96.0,96.0,96.0,93.0,93.0,93.0,93.0,93.0,93.0,93.0,93.0,93.0,93.0,93.0,94.0,94.0,94.0,95.0,95.0,95.0,95.0,95.0,95.0,95.0,95.0,95.0,95.0,95.0,95.0]},"王律婷(成長)":{"booked":[16.0,16.0,18.0,20.0,21.0,19.0,18.0,17.0,18.0,18.0,18.0,18.0,16.0,16.0,17.0,16.0,16.0,16.0,17.0,15.0,16.0,16.0,17.0,19.0,19.0,19.0,19.0,19.0,19.0,19.0,19.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[43.0,43.0,43.0,43.0,43.0,43.0,43.0,42.0,42.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0,43.0]}}},"高雄":{"dates":["2026/5/1","2026/5/2","2026/5/3","2026/5/4","2026/5/5","2026/5/6","2026/5/7","2026/5/8","2026/5/9","2026/5/10","2026/5/11","2026/5/12","2026/5/13","2026/5/14","2026/5/15","2026/5/16","2026/5/17","2026/5/18","2026/5/19","2026/5/20","2026/5/21","2026/5/22","2026/5/23","2026/5/24","2026/5/25","2026/5/26","2026/5/27","2026/5/28","2026/5/29","2026/5/30","2026/5/31"],"doctors":{"李唐越":{"booked":[27.0,32.0,39.0,45.0,49.0,53.0,57.0,57.0,60.0,59.0,61.0,62.0,62.0,66.0,65.0,63.0,62.0,63.0,66.0,66.0,66.0,67.0,68.0,70.0,72.0,72.0,74.0,72.0,75.0,73.0,72.0],"unspec":[5.0,5.0,6.0,8.0,10.0,10.0,11.0,11.0,11.0,12.0,12.0,12.0,12.0,12.0,12.0,12.0,12.0,12.0,12.0,13.0,13.0,13.0,13.0,14.0,14.0,14.0,14.0,15.0,16.0,16.0,15.0],"total":[90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,90.0,91.0]},"李思賢":{"booked":[5.0,8.0,9.0,9.0,9.0,10.0,10.0,13.0,13.0,13.0,14.0,14.0,15.0,16.0,18.0,19.0,20.0,20.0,20.0,23.0,26.0,27.0,29.0,30.0,30.0,27.0,29.0,27.0,28.0,28.0,28.0],"unspec":[1.0,2.0,2.0,2.0,2.0,3.0,3.0,6.0,6.0,6.0,7.0,7.0,8.0,9.0,10.0,11.0,11.0,11.0,11.0,14.0,15.0,16.0,17.0,18.0,18.0,16.0,16.0,16.0,17.0,17.0,17.0],"total":[71.0,71.0,71.0,71.0,71.0,71.0,71.0,71.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,75.0,75.0,75.0,75.0,75.0,75.0,79.0,79.0,79.0,79.0,79.0]},"范亞萱":{"booked":[22.0,22.0,24.0,25.0,27.0,30.0,30.0,29.0,29.0,29.0,29.0,30.0,30.0,30.0,31.0,31.0,34.0,39.0,41.0,40.0,43.0,45.0,45.0,46.0,49.0,50.0,49.0,49.0,48.0,48.0,48.0],"unspec":[8.0,8.0,10.0,11.0,13.0,13.0,13.0,13.0,13.0,13.0,13.0,14.0,15.0,15.0,16.0,16.0,19.0,24.0,25.0,24.0,27.0,29.0,29.0,31.0,33.0,33.0,33.0,33.0,32.0,32.0,32.0],"total":[109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,109.0,108.0,108.0,108.0,108.0,108.0,108.0,108.0,108.0,108.0,108.0,108.0]},"劉曜增":{"booked":[26.0,29.0,32.0,36.0,36.0,36.0,36.0,36.0,42.0,44.0,44.0,42.0,43.0,44.0,46.0,47.0,48.0,51.0,51.0,53.0,57.0,58.0,59.0,61.0,62.0,61.0,60.0,61.0,61.0,61.0,61.0],"unspec":[23.0,25.0,28.0,31.0,31.0,32.0,33.0,33.0,38.0,39.0,39.0,38.0,39.0,40.0,41.0,42.0,43.0,46.0,46.0,48.0,52.0,53.0,54.0,56.0,57.0,56.0,56.0,57.0,57.0,57.0,57.0],"total":[152.0,152.0,152.0,153.0,152.0,152.0,152.0,152.0,151.0,150.0,150.0,150.0,151.0,151.0,151.0,151.0,151.0,151.0,152.0,151.0,151.0,151.0,151.0,151.0,151.0,150.0,150.0,150.0,150.0,150.0,150.0]}}}},"6":{"台北":{"dates":["2026/6/1","2026/6/2","2026/6/3","2026/6/4","2026/6/5","2026/6/6","2026/6/7","2026/6/8","2026/6/9","2026/6/10","2026/6/11","2026/6/12","2026/6/13","2026/6/14","2026/6/15","2026/6/16","2026/6/17","2026/6/18","2026/6/19","2026/6/20","2026/6/21","2026/6/22","2026/6/23","2026/6/24","2026/6/25","2026/6/26","2026/6/27","2026/6/28","2026/6/29","2026/6/30"],"doctors":{"宋晏仁":{"booked":[17.0,21.0,25.0,24.0,27.0,26.0,26.0,28.0,32.0,29.0,31.0,31.0,30.0,32.0,35.0,34.0,35.0,34.0,34.0,35.0,36.0,37.0,36.0,32.0,33.0,35.0,32.0,32.0,33.0,33.0],"unspec":[2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0],"total":[83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,82.0,82.0,82.0,82.0,82.0,82.0]},"鄧雯心":{"booked":[57.0,58.0,59.0,61.0,62.0,63.0,63.0,63.0,62.0,63.0,61.0,61.0,60.0,60.0,61.0,61.0,62.0,62.0,62.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0,65.0]},"王律婷":{"booked":[2.0,3.0,3.0,4.0,4.0,4.0,4.0,4.0,4.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,6.0,6.0,7.0,7.0,7.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0],"unspec":[0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0,1.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0],"total":[8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0]},"王律婷(成長)":{"booked":[4.0,3.0,3.0,3.0,3.0,3.0,3.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,3.0,3.0,3.0,3.0,3.0,3.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0]},"李唐越":{"booked":[15.0,15.0,14.0,15.0,15.0,15.0,16.0,16.0,16.0,15.0,14.0,11.0,11.0,11.0,11.0,11.0,11.0,11.0,11.0,12.0,12.0,13.0,13.0,13.0,13.0,13.0,13.0,13.0,13.0,13.0],"unspec":[7.0,7.0,7.0,8.0,8.0,7.0,7.0,7.0,7.0,7.0,7.0,4.0,5.0,5.0,5.0,5.0,5.0,5.0,5.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0],"total":[24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0,24.0]},"周建安":{"booked":[22.0,25.0,21.0,23.0,25.0,28.0,28.0,32.0,31.0,36.0,42.0,42.0,40.0,41.0,49.0,47.0,50.0,52.0,53.0,55.0,56.0,56.0,55.0,56.0,58.0,60.0,63.0,62.0,62.0,62.0],"unspec":[19.0,22.0,18.0,19.0,20.0,20.0,20.0,22.0,23.0,25.0,29.0,29.0,27.0,27.0,31.0,32.0,36.0,38.0,39.0,40.0,40.0,40.0,39.0,40.0,42.0,44.0,45.0,45.0,45.0,45.0],"total":[90.0,90.0,90.0,98.0,98.0,98.0,98.0,98.0,98.0,98.0,98.0,98.0,98.0,98.0,98.0,102.0,102.0,102.0,102.0,102.0,102.0,102.0,102.0,102.0,102.0,102.0,102.0,102.0,102.0,102.0]},"許芷瑜":{"booked":[21.0,25.0,25.0,27.0,34.0,35.0,38.0,42.0,45.0,47.0,51.0,52.0,54.0,53.0,55.0,57.0,57.0,59.0,59.0,60.0,59.0,63.0,63.0,62.0,65.0,66.0,67.0,67.0,67.0,68.0],"unspec":[11.0,13.0,13.0,15.0,19.0,20.0,21.0,24.0,24.0,27.0,28.0,30.0,31.0,30.0,31.0,33.0,32.0,33.0,33.0,33.0,34.0,38.0,36.0,37.0,38.0,39.0,41.0,41.0,41.0,41.0],"total":[96.0,95.0,95.0,107.0,107.0,107.0,107.0,107.0,107.0,107.0,107.0,110.0,110.0,110.0,110.0,113.0,113.0,113.0,113.0,113.0,113.0,113.0,113.0,113.0,113.0,113.0,113.0,113.0,113.0,113.0]},"魏士航":{"booked":[4.0,4.0,6.0,6.0,6.0,6.0,6.0,7.0,7.0,8.0,8.0,8.0,8.0,9.0,9.0,9.0,9.0,9.0,9.0,9.0,9.0,9.0,9.0,9.0,9.0,9.0,9.0,9.0,9.0,9.0],"unspec":[3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0],"total":[14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0]},"陳威龍":{"booked":[33.0,37.0,37.0,40.0,41.0,46.0,50.0,57.0,61.0,62.0,67.0,68.0,70.0,73.0,76.0,78.0,81.0,83.0,85.0,87.0,94.0,96.0,97.0,97.0,98.0,99.0,102.0,103.0,105.0,105.0],"unspec":[23.0,26.0,28.0,31.0,31.0,36.0,38.0,42.0,45.0,47.0,52.0,55.0,57.0,59.0,62.0,62.0,64.0,65.0,68.0,70.0,74.0,76.0,76.0,76.0,76.0,77.0,78.0,78.0,80.0,81.0],"total":[154.0,154.0,154.0,158.0,158.0,158.0,158.0,158.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0]}}},"新竹":{"dates":["2026/6/1","2026/6/2","2026/6/3","2026/6/4","2026/6/5","2026/6/6","2026/6/7","2026/6/8","2026/6/9","2026/6/10","2026/6/11","2026/6/12","2026/6/13","2026/6/14","2026/6/15","2026/6/16","2026/6/17","2026/6/18","2026/6/19","2026/6/20","2026/6/21","2026/6/22","2026/6/23","2026/6/24","2026/6/25","2026/6/26","2026/6/27","2026/6/28","2026/6/29","2026/6/30"],"doctors":{"魏士航":{"booked":[53.0,53.0,54.0,53.0,52.0,51.0,53.0,58.0,58.0,58.0,60.0,59.0,61.0,65.0,67.0,64.0,63.0,68.0,73.0,76.0,77.0,77.0,76.0,74.0,73.0,73.0,71.0,72.0,72.0,71.0],"unspec":[26.0,28.0,29.0,28.0,28.0,28.0,28.0,30.0,28.0,29.0,29.0,29.0,29.0,31.0,31.0,30.0,29.0,34.0,37.0,38.0,38.0,38.0,37.0,36.0,35.0,35.0,35.0,35.0,35.0,35.0],"total":[88.0,88.0,88.0,88.0,88.0,88.0,88.0,88.0,88.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0,87.0]},"陳威龍":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"王律婷":{"booked":[31.0,30.0,31.0,37.0,39.0,39.0,40.0,44.0,44.0,43.0,44.0,45.0,47.0,50.0,48.0,47.0,49.0,51.0,52.0,54.0,56.0,61.0,59.0,58.0,58.0,58.0,58.0,58.0,58.0,58.0],"unspec":[3.0,4.0,5.0,7.0,7.0,7.0,7.0,9.0,10.0,13.0,15.0,18.0,20.0,22.0,22.0,22.0,23.0,24.0,27.0,28.0,29.0,33.0,33.0,32.0,32.0,32.0,32.0,32.0,32.0,32.0],"total":[87.0,87.0,78.0,78.0,78.0,78.0,78.0,78.0,78.0,79.0,79.0,79.0,80.0,80.0,80.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0]},"王律婷(成長)":{"booked":[14.0,14.0,14.0,14.0,14.0,17.0,17.0,17.0,16.0,14.0,14.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[58.0,20.0,20.0,20.0,20.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0,21.0]}}},"高雄":{"dates":["2026/6/1","2026/6/2","2026/6/3","2026/6/4","2026/6/5","2026/6/6","2026/6/7","2026/6/8","2026/6/9","2026/6/10","2026/6/11","2026/6/12","2026/6/13","2026/6/14","2026/6/15","2026/6/16","2026/6/17","2026/6/18","2026/6/19","2026/6/20","2026/6/21","2026/6/22","2026/6/23","2026/6/24","2026/6/25","2026/6/26","2026/6/27","2026/6/28","2026/6/29","2026/6/30"],"doctors":{"李唐越":{"booked":[33.0,36.0,41.0,41.0,41.0,42.0,43.0,45.0,48.0,51.0,51.0,54.0,57.0,55.0,60.0,61.0,64.0,68.0,68.0,70.0,71.0,73.0,73.0,77.0,71.0,73.0,71.0,72.0,73.0,70.0],"unspec":[6.0,5.0,5.0,5.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,8.0,9.0,11.0,13.0,13.0,15.0,16.0,16.0,16.0,16.0,17.0,17.0,17.0,15.0,15.0,13.0,13.0,13.0,14.0],"total":[100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0,101.0,101.0,101.0]},"李思賢":{"booked":[20.0,19.0,20.0,23.0,24.0,26.0,25.0,26.0,26.0,25.0,27.0,27.0,27.0,32.0,34.0,33.0,34.0,32.0,33.0,33.0,35.0,34.0,32.0,31.0,34.0,32.0,31.0,31.0,31.0,31.0],"unspec":[12.0,11.0,12.0,15.0,13.0,16.0,15.0,15.0,14.0,14.0,14.0,14.0,14.0,16.0,16.0,18.0,18.0,17.0,18.0,18.0,21.0,20.0,20.0,19.0,21.0,19.0,19.0,19.0,19.0,19.0],"total":[103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0,103.0]},"范亞萱":{"booked":[16.0,15.0,17.0,18.0,16.0,18.0,20.0,24.0,28.0,28.0,24.0,28.0,29.0,30.0,32.0,34.0,41.0,44.0,46.0,47.0,45.0,48.0,49.0,52.0,53.0,52.0,54.0,53.0,52.0,53.0],"unspec":[9.0,8.0,10.0,10.0,8.0,9.0,9.0,13.0,17.0,18.0,16.0,16.0,17.0,18.0,19.0,22.0,28.0,31.0,32.0,33.0,31.0,34.0,34.0,37.0,37.0,36.0,38.0,37.0,36.0,37.0],"total":[124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,124.0,123.0,123.0,123.0,123.0,123.0,123.0,123.0,123.0,123.0]},"劉曜增":{"booked":[17.0,21.0,20.0,22.0,23.0,23.0,24.0,30.0,28.0,28.0,29.0,29.0,33.0,36.0,39.0,39.0,42.0,43.0,43.0,46.0,45.0,46.0,47.0,46.0,47.0,49.0,49.0,48.0,49.0,49.0],"unspec":[15.0,18.0,17.0,18.0,19.0,20.0,21.0,27.0,25.0,25.0,26.0,26.0,29.0,32.0,35.0,35.0,37.0,37.0,37.0,40.0,39.0,40.0,41.0,41.0,42.0,44.0,44.0,43.0,44.0,44.0],"total":[129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0,129.0]}}}},"7":{"台北":{"dates":["2026/7/1","2026/7/2","2026/7/3","2026/7/4","2026/7/5","2026/7/6","2026/7/7","2026/7/8","2026/7/9","2026/7/10","2026/7/11","2026/7/12","2026/7/13","2026/7/14","2026/7/15","2026/7/16","2026/7/17","2026/7/18","2026/7/19","2026/7/20","2026/7/21","2026/7/22","2026/7/23","2026/7/24"],"doctors":{"宋晏仁":{"booked":[20.0,20.0,23.0,29.0,31.0,34.0,37.0,39.0,39.0,38.0,34.0,34.0,36.0,39.0,34.0,36.0,36.0,38.0,38.0,38.0,38.0,39.0,38.0,39.0],"unspec":[1.0,1.0,1.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0],"total":[72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0,72.0]},"鄧雯心":{"booked":[60.0,63.0,67.0,71.0,71.0,71.0,70.0,71.0,72.0,72.0,72.0,72.0,72.0,72.0,71.0,72.0,70.0,70.0,70.0,70.0,69.0,70.0,68.0,69.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,74.0,73.0]},"王律婷":{"booked":[2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0,3.0],"unspec":[2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0],"total":[8.0,8.0,8.0,7.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0]},"王律婷(成長)":{"booked":[4.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,3.0,3.0,3.0,3.0,3.0,2.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0]},"李唐越":{"booked":[10.0,11.0,11.0,11.0,12.0,12.0,14.0,12.0,11.0,10.0,9.0,11.0,11.0,11.0,13.0,14.0,15.0,15.0,16.0,16.0,16.0,15.0,16.0,16.0],"unspec":[6.0,7.0,7.0,7.0,8.0,8.0,10.0,8.0,7.0,6.0,5.0,6.0,6.0,6.0,8.0,8.0,8.0,8.0,8.0,8.0,9.0,9.0,10.0,10.0],"total":[23.0,23.0,23.0,23.0,23.0,23.0,23.0,23.0,22.0,23.0,23.0,23.0,23.0,23.0,23.0,23.0,23.0,23.0,23.0,23.0,23.0,23.0,23.0,23.0]},"周建安":{"booked":[23.0,29.0,35.0,37.0,40.0,43.0,42.0,45.0,45.0,48.0,52.0,50.0,51.0,52.0,53.0,54.0,55.0,55.0,55.0,56.0,56.0,57.0,59.0,66.0],"unspec":[18.0,24.0,28.0,29.0,31.0,32.0,31.0,35.0,35.0,35.0,36.0,35.0,36.0,37.0,38.0,40.0,39.0,40.0,40.0,41.0,41.0,42.0,44.0,47.0],"total":[111.0,111.0,111.0,111.0,111.0,111.0,111.0,111.0,121.0,121.0,120.0,119.0,119.0,119.0,119.0,119.0,119.0,119.0,119.0,119.0,119.0,119.0,119.0,119.0]},"許芷瑜":{"booked":[19.0,22.0,25.0,26.0,27.0,29.0,32.0,32.0,35.0,38.0,42.0,46.0,49.0,52.0,51.0,53.0,53.0,52.0,51.0,53.0,54.0,56.0,58.0,60.0],"unspec":[3.0,5.0,7.0,8.0,8.0,9.0,11.0,11.0,14.0,16.0,19.0,21.0,23.0,24.0,22.0,22.0,22.0,23.0,23.0,25.0,25.0,27.0,30.0,31.0],"total":[88.0,88.0,88.0,88.0,88.0,88.0,88.0,88.0,92.0,92.0,92.0,92.0,92.0,92.0,92.0,92.0,92.0,92.0,92.0,92.0,92.0,92.0,92.0,92.0]},"魏士航":{"booked":[4.0,4.0,3.0,3.0,6.0,8.0,9.0,9.0,9.0,10.0,10.0,10.0,10.0,10.0,11.0,11.0,11.0,11.0,11.0,12.0,12.0,12.0,12.0,12.0],"unspec":[2.0,2.0,1.0,1.0,4.0,5.0,5.0,5.0,5.0,6.0,6.0,6.0,6.0,6.0,7.0,7.0,7.0,7.0,7.0,7.0,8.0,8.0,8.0,8.0],"total":[14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0]},"陳威龍":{"booked":[43.0,48.0,54.0,59.0,61.0,70.0,69.0,74.0,81.0,85.0,87.0,92.0,96.0,99.0,98.0,103.0,106.0,107.0,108.0,110.0,114.0,114.0,117.0,122.0],"unspec":[32.0,37.0,43.0,46.0,48.0,55.0,54.0,59.0,64.0,67.0,69.0,73.0,77.0,79.0,78.0,82.0,85.0,87.0,88.0,90.0,93.0,93.0,96.0,100.0],"total":[161.0,161.0,161.0,160.0,160.0,160.0,160.0,159.0,157.0,157.0,157.0,157.0,157.0,158.0,158.0,158.0,159.0,159.0,159.0,159.0,159.0,159.0,159.0,159.0]},"楊德仁":{"booked":[null,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[null,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[null,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]}}},"新竹":{"dates":["2026/7/1","2026/7/2","2026/7/3","2026/7/4","2026/7/5","2026/7/6","2026/7/7","2026/7/8","2026/7/9","2026/7/10","2026/7/11","2026/7/12","2026/7/13","2026/7/14","2026/7/15","2026/7/16","2026/7/17","2026/7/18","2026/7/19","2026/7/20","2026/7/21","2026/7/22","2026/7/23","2026/7/24"],"doctors":{"魏士航":{"booked":[44.0,48.0,46.0,48.0,50.0,52.0,56.0,57.0,62.0,68.0,71.0,71.0,72.0,73.0,73.0,72.0,70.0,68.0,69.0,70.0,71.0,71.0,71.0,71.0],"unspec":[23.0,23.0,21.0,22.0,23.0,22.0,27.0,28.0,33.0,34.0,37.0,37.0,38.0,38.0,38.0,38.0,37.0,37.0,38.0,39.0,39.0,39.0,39.0,39.0],"total":[78.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,79.0,80.0,80.0,80.0,80.0]},"陳威龍":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"王律婷":{"booked":[25.0,28.0,29.0,29.0,31.0,33.0,33.0,34.0,34.0,35.0,38.0,40.0,42.0,43.0,45.0,48.0,49.0,49.0,49.0,52.0,53.0,53.0,53.0,53.0],"unspec":[15.0,16.0,16.0,16.0,17.0,17.0,18.0,17.0,17.0,18.0,18.0,18.0,20.0,21.0,23.0,24.0,24.0,24.0,25.0,25.0,27.0,27.0,27.0,26.0],"total":[87.0,87.0,86.0,86.0,86.0,86.0,86.0,86.0,86.0,86.0,85.0,85.0,85.0,85.0,85.0,85.0,85.0,85.0,85.0,85.0,85.0,85.0,85.0,85.0]},"王律婷(成長)":{"booked":[11.0,11.0,11.0,11.0,11.0,11.0,11.0,11.0,9.0,9.0,8.0,8.0,8.0,8.0,9.0,9.0,9.0,8.0,8.0,9.0,9.0,8.0,8.0,8.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[12.0,12.0,12.0,12.0,12.0,12.0,12.0,12.0,12.0,12.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0,10.0]},"楊德仁":{"booked":[null,0.0,0.0,1.0,3.0,6.0,7.0,7.0,9.0,11.0,13.0,15.0,15.0,14.0,14.0,20.0,19.0,19.0,19.0,20.0,19.0,22.0,23.0,26.0],"unspec":[null,0.0,0.0,1.0,3.0,6.0,7.0,7.0,9.0,11.0,12.0,14.0,14.0,13.0,13.0,19.0,18.0,18.0,18.0,19.0,18.0,19.0,21.0,24.0],"total":[null,76.0,76.0,76.0,76.0,76.0,76.0,76.0,76.0,76.0,75.0,75.0,75.0,75.0,75.0,75.0,75.0,75.0,75.0,75.0,75.0,76.0,76.0,76.0]}}},"高雄":{"dates":["2026/7/1","2026/7/2","2026/7/3","2026/7/4","2026/7/5","2026/7/6","2026/7/7","2026/7/8","2026/7/9","2026/7/10","2026/7/11","2026/7/12","2026/7/13","2026/7/14","2026/7/15","2026/7/16","2026/7/17","2026/7/18","2026/7/19","2026/7/20","2026/7/21","2026/7/22","2026/7/23","2026/7/24"],"doctors":{"李唐越":{"booked":[22.0,21.0,25.0,29.0,32.0,34.0,36.0,37.0,38.0,40.0,43.0,41.0,47.0,51.0,52.0,52.0,51.0,52.0,50.0,51.0,51.0,51.0,51.0,51.0],"unspec":[2.0,2.0,2.0,3.0,4.0,5.0,6.0,6.0,6.0,7.0,9.0,9.0,11.0,10.0,10.0,10.0,10.0,10.0,9.0,9.0,10.0,10.0,10.0,10.0],"total":[70.0,66.0,66.0,66.0,66.0,66.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0,63.0]},"李思賢":{"booked":[20.0,22.0,27.0,32.0,36.0,39.0,41.0,45.0,47.0,51.0,51.0,53.0,53.0,55.0,58.0,58.0,56.0,55.0,55.0,60.0,62.0,62.0,67.0,70.0],"unspec":[15.0,16.0,19.0,24.0,26.0,29.0,31.0,31.0,33.0,33.0,34.0,35.0,35.0,35.0,37.0,36.0,35.0,35.0,36.0,40.0,42.0,43.0,47.0,48.0],"total":[140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0,140.0]},"范亞萱":{"booked":[10.0,12.0,16.0,18.0,18.0,20.0,25.0,27.0,27.0,27.0,25.0,27.0,28.0,31.0,30.0,34.0,38.0,39.0,39.0,42.0,47.0,51.0,52.0,56.0],"unspec":[7.0,9.0,11.0,12.0,12.0,13.0,17.0,17.0,17.0,18.0,15.0,17.0,17.0,21.0,19.0,23.0,27.0,28.0,28.0,30.0,33.0,36.0,37.0,38.0],"total":[131.0,130.0,130.0,130.0,130.0,130.0,130.0,130.0,130.0,130.0,123.0,123.0,123.0,123.0,123.0,123.0,123.0,123.0,123.0,123.0,123.0,123.0,123.0,123.0]},"劉曜增":{"booked":[18.0,20.0,22.0,23.0,29.0,31.0,35.0,39.0,38.0,41.0,40.0,42.0,47.0,49.0,56.0,57.0,58.0,61.0,62.0,63.0,63.0,64.0,66.0,65.0],"unspec":[16.0,17.0,19.0,20.0,26.0,28.0,32.0,36.0,35.0,39.0,38.0,40.0,45.0,47.0,54.0,55.0,56.0,57.0,58.0,59.0,59.0,60.0,62.0,61.0],"total":[192.0,192.0,192.0,192.0,192.0,192.0,192.0,192.0,192.0,192.0,186.0,185.0,185.0,185.0,184.0,184.0,183.0,183.0,183.0,183.0,183.0,183.0,183.0,183.0]}}}},"8":{"台北":{"dates":["2026/7/2","2026/7/3","2026/7/4","2026/7/5","2026/7/6","2026/7/7","2026/7/8","2026/7/9","2026/7/10","2026/7/11","2026/7/12","2026/7/13","2026/7/14","2026/7/15","2026/7/16","2026/7/17","2026/7/18","2026/7/19","2026/7/20","2026/7/21","2026/7/22","2026/7/23","2026/7/24"],"doctors":{"宋晏仁":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,5.0,6.0,8.0,9.0,10.0,12.0,14.0,17.0,20.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0,83.0]},"鄧雯心":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,19.0,24.0,28.0,34.0,36.0,41.0,43.0,44.0,47.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,54.0,54.0,54.0,54.0,54.0,54.0,54.0,54.0,53.0]},"王律婷":{"booked":[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2.0,2.0,2.0,2.0,2.0,2.0,2.0],"total":[1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0,8.0]},"王律婷(成長)":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,1.0,2.0,2.0,5.0,5.0,6.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0,6.0]},"李唐越":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,3.0,6.0,6.0,7.0,7.0,7.0,7.0,7.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,22.0,22.0,22.0,22.0,22.0,22.0,22.0,22.0,22.0]},"周建安":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,7.0,8.0,8.0,8.0,9.0,10.0,10.0,10.0,12.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4.0,4.0,4.0,4.0,5.0,6.0,6.0,6.0,9.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,119.0,119.0,119.0,119.0,119.0,119.0,119.0,119.0,119.0]},"許芷瑜":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4.0,6.0,8.0,9.0,8.0,10.0,9.0,11.0,13.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,2.0,3.0,3.0,3.0,3.0,4.0,5.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,84.0,84.0,84.0,84.0,84.0,84.0,84.0,84.0,84.0]},"魏士航":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,2.0,2.0,4.0,5.0,10.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,1.0,1.0,1.0,1.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0,14.0]},"陳威龍":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4.0,4.0,4.0,5.0,6.0,7.0,11.0,19.0,24.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,3.0,3.0,3.0,4.0,4.0,5.0,7.0,13.0,17.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,153.0,153.0,153.0,153.0,153.0,153.0,153.0,153.0,153.0]},"楊德仁":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]}}},"新竹":{"dates":["2026/7/2","2026/7/3","2026/7/4","2026/7/5","2026/7/6","2026/7/7","2026/7/8","2026/7/9","2026/7/10","2026/7/11","2026/7/12","2026/7/13","2026/7/14","2026/7/15","2026/7/16","2026/7/17","2026/7/18","2026/7/19","2026/7/20","2026/7/21","2026/7/22","2026/7/23","2026/7/24"],"doctors":{"魏士航":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,5.0,8.0,12.0,12.0,13.0,14.0,17.0,20.0,26.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4.0,4.0,4.0,4.0,4.0,4.0,4.0,5.0,7.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,90.0,90.0,90.0,90.0,90.0,87.0,87.0,87.0,87.0]},"陳威龍":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"王律婷":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,4.0,7.0,10.0,12.0,14.0,14.0,16.0,19.0,19.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,4.0,5.0,6.0,7.0,7.0,7.0,10.0,12.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,84.0,84.0,84.0,84.0,84.0,84.0,84.0,84.0,84.0]},"王律婷(成長)":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2.0,6.0,6.0,6.0,6.0,7.0,8.0,9.0,9.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0,15.0]},"楊德仁":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,2.0,2.0,2.0,1.0,1.0,1.0,2.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,2.0,2.0,2.0,1.0,1.0,1.0,2.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,93.0,93.0,92.0,92.0,92.0,93.0,93.0,93.0,93.0]}}},"高雄":{"dates":["2026/7/2","2026/7/3","2026/7/4","2026/7/5","2026/7/6","2026/7/7","2026/7/8","2026/7/9","2026/7/10","2026/7/11","2026/7/12","2026/7/13","2026/7/14","2026/7/15","2026/7/16","2026/7/17","2026/7/18","2026/7/19","2026/7/20","2026/7/21","2026/7/22","2026/7/23","2026/7/24"],"doctors":{"李唐越":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2.0,5.0,6.0,8.0,8.0,11.0,14.0,15.0,17.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,69.0,69.0,69.0,69.0,69.0,69.0,69.0,69.0,69.0]},"李思賢":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2.0,5.0,6.0,8.0,8.0,11.0,13.0,13.0,14.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,3.0,4.0,4.0,4.0,6.0,7.0,7.0,7.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,148.0,148.0,148.0,148.0,148.0,148.0,148.0,148.0,148.0]},"范亞萱":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,3.0,3.0,3.0,5.0,7.0,8.0,10.0,11.0,12.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,2.0,2.0,1.0,2.0,3.0,4.0,6.0,7.0,8.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,120.0,120.0,120.0,120.0,120.0,120.0,120.0,120.0,120.0]},"劉曜增":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,3.0,3.0,3.0,3.0,3.0,3.0,4.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,1.0,3.0,3.0,3.0,3.0,3.0,3.0,4.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0,157.0]}}}},"9":{"台北":{"dates":["2026/7/2","2026/7/3","2026/7/4","2026/7/5","2026/7/6","2026/7/7","2026/7/8","2026/7/9","2026/7/10","2026/7/11","2026/7/12","2026/7/13","2026/7/14","2026/7/15","2026/7/16","2026/7/17","2026/7/18","2026/7/19","2026/7/20","2026/7/21","2026/7/22","2026/7/23","2026/7/24"],"doctors":{"宋晏仁":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"鄧雯心":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"王律婷":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"王律婷(成長)":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"李唐越":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"周建安":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"許芷瑜":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"魏士航":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"陳威龍":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"楊德仁":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]}}},"新竹":{"dates":["2026/7/2","2026/7/3","2026/7/4","2026/7/5","2026/7/6","2026/7/7","2026/7/8","2026/7/9","2026/7/10","2026/7/11","2026/7/12","2026/7/13","2026/7/14","2026/7/15","2026/7/16","2026/7/17","2026/7/18","2026/7/19","2026/7/20","2026/7/21","2026/7/22","2026/7/23","2026/7/24"],"doctors":{"魏士航":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"陳威龍":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"王律婷":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"王律婷(成長)":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"楊德仁":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]}}},"高雄":{"dates":["2026/7/2","2026/7/3","2026/7/4","2026/7/5","2026/7/6","2026/7/7","2026/7/8","2026/7/9","2026/7/10","2026/7/11","2026/7/12","2026/7/13","2026/7/14","2026/7/15","2026/7/16","2026/7/17","2026/7/18","2026/7/19","2026/7/20","2026/7/21","2026/7/22","2026/7/23","2026/7/24"],"doctors":{"李唐越":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"李思賢":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"范亞萱":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]},"劉曜增":{"booked":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"unspec":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0],"total":[0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0]}}}}};
+function normalizeDoctorName(name) { return NAME_MAP[name] || name; }
+function getClinicData(month, clinic, endDate) {
+  const raw = SNAPSHOT[month] && SNAPSHOT[month][clinic];
+  if (!raw) return null;
+  let idx = -1;
+  for (let i = 0; i < raw.dates.length; i++) {
+    const d = raw.dates[i];
+    const [y, m, dd] = d.split('/');
+    const [ty, tm, td] = endDate.split('-');
+    if (y == ty && parseInt(m) == parseInt(tm) && parseInt(dd) <= parseInt(td)) idx = i;
+  }
+  if (idx === -1) idx = raw.dates.length - 1;
+  const perDoctor = {};
+  let unspecTotal = 0;
+  for (const drRaw in raw.doctors) {
+    const dr = normalizeDoctorName(drRaw);
+    const b = raw.doctors[drRaw].booked;
+    const u = raw.doctors[drRaw].unspec || [];
+    const t = raw.doctors[drRaw].total || [];
+    const booked = (b[idx] === null || b[idx] === undefined) ? 0 : b[idx];
+    const unspec = (u[idx] === null || u[idx] === undefined) ? 0 : u[idx];
+    const total = (t[idx] === null || t[idx] === undefined) ? 0 : t[idx];
+    let daily = 0;
+    if (idx > 0) {
+      const prev = b[idx-1] === null || b[idx-1] === undefined ? 0 : b[idx-1];
+      daily = booked - prev;
+    }
+    const series = b.slice(0, idx+1).map(v => (v === null || v === undefined) ? null : v);
+    perDoctor[dr] = { booked, unspec, total, dailyDelta: daily, series };
+    if (!dr.startsWith('不指定')) unspecTotal += unspec;
+  }
+  perDoctor['不指定 (分流)'] = { booked: unspecTotal, unspec: 0, total: 0, dailyDelta: 0, series: [] };
+  return { perDoctor, dates: raw.dates.slice(0, idx+1), idx };
+}
+function getMonthAtDay(month, clinic, dayN) {
+  const raw = SNAPSHOT[month] && SNAPSHOT[month][clinic];
+  if (!raw) return null;
+  const idx = Math.min(dayN - 1, raw.dates.length - 1);
+  const perDoctor = {};
+  for (const drRaw in raw.doctors) {
+    const dr = normalizeDoctorName(drRaw);
+    const b = raw.doctors[drRaw].booked;
+    const u = raw.doctors[drRaw].unspec || [];
+    const t = raw.doctors[drRaw].total || [];
+    perDoctor[dr] = {
+      booked: (b[idx] === null || b[idx] === undefined) ? 0 : b[idx],
+      unspec: (u[idx] === null || u[idx] === undefined) ? 0 : u[idx],
+      total: (t[idx] === null || t[idx] === undefined) ? 0 : t[idx],
+    };
+  }
+  return perDoctor;
+}
+function getMonthFinal(month, clinic) {
+  const raw = SNAPSHOT[month] && SNAPSHOT[month][clinic];
+  if (!raw) return null;
+  const perDoctor = {};
+  for (const drRaw in raw.doctors) {
+    const dr = normalizeDoctorName(drRaw);
+    const b = raw.doctors[drRaw].booked;
+    const u = raw.doctors[drRaw].unspec || [];
+    const t = raw.doctors[drRaw].total || [];
+    let latestB = 0, latestU = 0, latestT = 0;
+    for (let i = b.length - 1; i >= 0; i--) if (b[i] !== null && b[i] !== undefined) { latestB = b[i]; break; }
+    for (let i = u.length - 1; i >= 0; i--) if (u[i] !== null && u[i] !== undefined) { latestU = u[i]; break; }
+    for (let i = t.length - 1; i >= 0; i--) if (t[i] !== null && t[i] !== undefined) { latestT = t[i]; break; }
+    perDoctor[dr] = { booked: latestB, unspec: latestU, total: latestT };
+  }
+  return perDoctor;
+}
+function daysInMonth(year, month) { return new Date(year, month, 0).getDate(); }
+function statusOf(rate) {
+  if (rate >= 0.9) return { icon: '🟢', label: '準點', className: 'g' };
+  if (rate >= 0.75) return { icon: '🟡', label: '略慢', className: 'y' };
+  return { icon: '🔴', label: '落後', className: 'r' };
+}
+function pct(v) { return (v * 100).toFixed(0) + '%'; }
+let chartInstance = null, chartUnspecInstance = null, chartUnspecRatioInstance = null;
+let donutCharts = [];
+function render(month, endDate, filterClinic) {
+  if (!SNAPSHOT[month]) {
+    document.getElementById('clinicCards').innerHTML = '<div class="center-msg" style="grid-column: 1 / -1;">📭 該月份 sheet 尚未建立</div>';
+    document.getElementById('overallBar').innerHTML = '';
+    document.getElementById('redAlerts').innerHTML = '';
+    document.getElementById('yellowAlerts').innerHTML = '';
+    document.getElementById('docList').innerHTML = '';
+    document.getElementById('compareGrid').innerHTML = '';
+    document.getElementById('insights').innerHTML = '';
+    return;
+  }
+  const [yr, mm, dd] = endDate.split('-').map(Number);
+  const totalDays = daysInMonth(yr, mm);
+  const dayN = dd;
+  const timeProg = dayN / totalDays;
+  document.getElementById('timeProgress').textContent = `⏰ 時間進度 ${pct(timeProg)} (${dayN}/${totalDays} 天)`;
+  const dataDate = endDate <= SNAPSHOT_DATE ? endDate : SNAPSHOT_DATE;
+  document.getElementById('dataStatus').innerHTML = `📅 資料截止 ${dataDate}<span class="data-source-tag tag-snapshot">內嵌快照</span>`;
+  const clinicList = filterClinic === '全部' ? ['台北','新竹','高雄'] : [filterClinic];
+  const clinicData = {};
+  for (const clinic of clinicList) {
+    clinicData[clinic] = getClinicData(month, clinic, dataDate);
+  }
+  donutCharts.forEach(c => c.destroy());
+  donutCharts = [];
+  const cardsDiv = document.getElementById('clinicCards');
+  cardsDiv.className = 'cards ' + (clinicList.length === 1 ? 'single' : 'all');
+  cardsDiv.innerHTML = '';
+  let overallTarget = 0, overallAccum = 0;
+  for (const clinic of clinicList) {
+    const targets = TARGETS[clinic];
+    let target = 0, accum = 0;
+    for (const dr in targets) {
+      if (dr.startsWith('不指定')) continue;  // 排除不指定,只算指定醫師
+      target += targets[dr];
+      if (clinicData[clinic] && clinicData[clinic].perDoctor[dr]) {
+        accum += clinicData[clinic].perDoctor[dr].booked || 0;
+      }
+    }
+    overallTarget += target;
+    overallAccum += accum;
+    const actualProg = target > 0 ? accum / target : 0;
+    const achieveRate = timeProg > 0 ? actualProg / timeProg : 0;
+    const st = statusOf(achieveRate);
+    const donutColor = st.className === 'g' ? '#2E5A3A' : (st.className === 'y' ? '#C08020' : '#A03020');
+    const donutId = `donut-${clinic}-${Date.now()}-${Math.random().toString(36).substr(2,5)}`;
+    cardsDiv.insertAdjacentHTML('beforeend', `
+      <div class="card">
+        <div class="card-header">${clinic} 院所</div>
+        <div class="card-donut">
+          <div class="card-metrics">
+            <div class="card-row"><span class="card-label">目標 (指定醫師)</span><span class="card-big">${target}</span></div>
+            <div class="card-row"><span class="card-label">累積</span><span class="card-big card-actual">${accum}</span></div>
+            <div class="card-row"><span class="card-label">達成率</span><span class="card-big">${pct(achieveRate)} ${st.icon}</span></div>
+          </div>
+          <div class="donut-container"><canvas id="${donutId}"></canvas></div>
+        </div>
+      </div>`);
+    const donutData = Math.min(100, Math.round(actualProg * 100));
+    setTimeout(() => {
+      const ctx = document.getElementById(donutId);
+      if (!ctx) return;
+      const c = new Chart(ctx, {
+        type: 'doughnut',
+        data: { datasets: [{ data: [donutData, 100 - donutData], backgroundColor: [donutColor, '#F0E8D0'], borderWidth: 0 }] },
+        options: { responsive: true, maintainAspectRatio: true, cutout: '70%',
+          plugins: { legend: { display: false }, tooltip: { enabled: false } } },
+        plugins: [{ id: 'centerText', afterDraw: (chart) => {
+          const {ctx, chartArea: {left, top, width, height}} = chart;
+          ctx.save();
+          ctx.font = 'bold 16px 微軟正黑體';
+          ctx.fillStyle = donutColor;
+          ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(donutData + '%', left + width/2, top + height/2);
+          ctx.restore();
+        } }]
+      });
+      donutCharts.push(c);
+    }, 10);
+  }
+  const overallRate = timeProg > 0 && overallTarget > 0 ? (overallAccum/overallTarget)/timeProg : 0;
+  const overallSt = statusOf(overallRate);
+  const overallLabel = filterClinic === '全部' ? '三院所總計' : `${filterClinic} 院所總計`;
+  document.getElementById('overallBar').innerHTML = `
+    <div><div class="overall-label">${overallLabel} 目標 (指定醫師)</div><div class="overall-val">${overallTarget}</div></div>
+    <div><div class="overall-label">總累積 NP (指定醫師)</div><div class="overall-val">${overallAccum}</div></div>
+    <div><div class="overall-label">時間進度</div><div class="overall-val">${pct(timeProg)}</div></div>
+    <div><div class="overall-label">實際進度</div><div class="overall-val">${pct(overallTarget > 0 ? overallAccum/overallTarget : 0)}</div></div>
+    <div><div class="overall-label">達成率</div><div class="overall-val">${pct(overallRate)} ${overallSt.icon}</div></div>`;
+  document.getElementById('filterChip').innerHTML = filterClinic !== '全部' ? `<span class="chip">🏥 ${filterClinic}</span>` : '';
+  document.getElementById('filterChip2').innerHTML = filterClinic !== '全部' ? `<span class="chip">🏥 ${filterClinic}</span>` : '';
+  renderAlerts(clinicList, clinicData, timeProg);
+  renderDocList(clinicList, clinicData, timeProg, dayN, totalDays, month);
+  renderNPOpeningSplit(month, clinicList, dayN);
+  renderCompareCards(clinicList, month, dayN);
+  renderUnspecCharts(clinicList);
+  renderTrendChart(clinicList, clinicData);
+  renderInsights(clinicList, clinicData, timeProg);
+}
+function renderAlerts(clinicList, clinicData, timeProg) {
+  const redAlerts = [], yellowAlerts = [];
+  for (const clinic of clinicList) {
+    for (const dr of DOCTOR_ORDER[clinic]) {
+      if (dr === '陳威龍' && clinic === '新竹') continue;
+      const target = TARGETS[clinic][dr];
+      const dinfo = clinicData[clinic] && clinicData[clinic].perDoctor[dr];
+      const accum = dinfo ? dinfo.booked : 0;
+      const actualP = target > 0 ? accum / target : 0;
+      const achieve = timeProg > 0 && target > 0 ? actualP / timeProg : 0;
+      if (achieve < 0.75) redAlerts.push({ clinic, dr, accum, target, achieve, actualP });
+      else if (achieve < 0.9) yellowAlerts.push({ clinic, dr, accum, target, achieve, actualP });
+    }
+  }
+  document.getElementById('redAlerts').innerHTML = redAlerts.length === 0
+    ? '<div style="color:#888;font-size:12px;">👍 目前無醫師落後 &gt;25%</div>'
+    : redAlerts.map(a => `<div class="alert-item"><strong>${a.clinic} ${a.dr}</strong>：累積 ${a.accum}/${a.target} = ${pct(a.actualP)}（達成率 ${pct(a.achieve)}，應達 ${pct(timeProg)}）</div>`).join('');
+  document.getElementById('yellowAlerts').innerHTML = yellowAlerts.length === 0
+    ? '<div style="color:#888;font-size:12px;">✅ 無需觀察項目</div>'
+    : yellowAlerts.map(a => `<div class="alert-item"><strong>${a.clinic} ${a.dr}</strong>：累積 ${a.accum}/${a.target} = ${pct(a.actualP)}（達成率 ${pct(a.achieve)}）</div>`).join('');
+}
+// 開診日 NP 預約切分：用同一組 OPENING_DATES，把本月累積 NP 拆成開診前已達成 / 開診後新增
+function renderNPOpeningSplit(month, clinicList, dayN) {
+  const nextMonth = String(month + 1);
+  const rows = [];
+  const chips = [];
+  let anyOpening = false;
+  for (const cl of clinicList) {
+    const openDate = OPENING_DATES[nextMonth] && OPENING_DATES[nextMonth][cl];
+    const raw = SNAPSHOT[String(month)] && SNAPSHOT[String(month)][cl];
+    if (!raw || !raw.dates || raw.dates.length === 0) continue;
+    const idx = Math.min(dayN - 1, raw.dates.length - 1);
+    if (!openDate) {
+      rows.push({clinic: cl, noData: true});
+      continue;
+    }
+    anyOpening = true;
+    chips.push(`${cl} ${openDate.replace('2026/','')}`);
+    let openIdx = raw.dates.indexOf(openDate);
+    for (const drRaw in raw.doctors) {
+      const dr = normalizeDoctorName(drRaw);
+      const b = raw.doctors[drRaw].booked || [];
+      const curVal = (idx >= 0 && idx < b.length && b[idx] !== null && b[idx] !== undefined) ? b[idx] : 0;
+      let beforeVal = 0;
+      if (openIdx === -1) {
+        // 開診日不在本月資料範圍內(通常代表開診日在更早，本月一開始就已算開診後)
+        beforeVal = 0;
+      } else {
+        const beforeIdx = Math.min(openIdx - 1, idx);
+        beforeVal = (beforeIdx >= 0 && beforeIdx < b.length && b[beforeIdx] !== null && b[beforeIdx] !== undefined) ? b[beforeIdx] : 0;
+      }
+      const afterVal = curVal - beforeVal; // 可能為負值：代表開診後有淨取消/異動
+      if (curVal <= 0) continue;
+      rows.push({clinic: cl, dr, openDate, beforeVal, afterVal, total: curVal,
+                 pctAfter: curVal > 0 ? Math.round(afterVal/curVal*100) : 0});
+    }
+  }
+  document.getElementById('npOpeningChip').innerHTML = anyOpening
+    ? chips.map(l => `<span class="chip">🚪 ${l} 開診</span>`).join('')
+    : '';
+  if (rows.length === 0) {
+    document.getElementById('npOpeningSplitTable').innerHTML =
+      '<div style="color:#888;font-size:12px;padding:12px;">此月份尚無法偵測到次月開診日 (資料不足或次月尚未開始追蹤)</div>';
+    return;
+  }
+  rows.sort((a,b) => (b.total||0) - (a.total||0));
+  document.getElementById('npOpeningSplitTable').innerHTML = `
+    <table class="mat-table">
+      <thead><tr>
+        <th>院所</th><th>醫師</th><th>開診日</th>
+        <th style="text-align:right">開診前累積</th><th style="text-align:right">開診後新增</th>
+        <th style="text-align:right">目前累積</th><th>開診後佔比</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => {
+          if (r.noData) return `<tr><td>${r.clinic}</td><td colspan="6" style="color:#888;">尚無法偵測次月開診日</td></tr>`;
+          return `<tr>
+            <td>${r.clinic}</td>
+            <td>${r.dr}</td>
+            <td>${r.openDate}</td>
+            <td style="text-align:right;">${r.beforeVal}</td>
+            <td style="text-align:right;">${r.afterVal > 0 ? '+' : ''}${r.afterVal}</td>
+            <td style="text-align:right;">${r.total}</td>
+            <td><span class="mat-cpa-tag ${r.pctAfter < 0 ? 'r' : r.pctAfter >= 50 ? 'y' : 'g'}">${r.pctAfter}%</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+// 取得某醫師/不指定，在「次月開診日前一天」的累積值 (用來在進度條上切分開診前/後)
+function getOpeningVal(clinic, dr, month) {
+  const nextMonth = String(month + 1);
+  const openDate = OPENING_DATES[nextMonth] && OPENING_DATES[nextMonth][clinic];
+  const raw = SNAPSHOT[String(month)] && SNAPSHOT[String(month)][clinic];
+  if (!openDate || !raw) return { openDate: null, val: 0 };
+  const openIdx = raw.dates.indexOf(openDate);
+  if (openIdx <= 0) return { openDate, val: 0 };
+  const beforeIdx = openIdx - 1;
+  if (dr === '不指定 (分流)') {
+    let sum = 0;
+    for (const drRaw in raw.doctors) {
+      if (drRaw.startsWith('不指定')) continue;
+      const u = raw.doctors[drRaw].unspec || [];
+      const v = u[beforeIdx];
+      sum += (v === null || v === undefined) ? 0 : v;
+    }
+    return { openDate, val: sum };
+  }
+  let key = null;
+  for (const drRaw in raw.doctors) {
+    if (normalizeDoctorName(drRaw) === dr) { key = drRaw; break; }
+  }
+  if (!key) return { openDate, val: 0 };
+  const b = raw.doctors[key].booked || [];
+  const v = b[beforeIdx];
+  return { openDate, val: (v === null || v === undefined) ? 0 : v };
+}
+function renderDocList(clinicList, clinicData, timeProg, dayN, totalDays, month) {
+  const el = document.getElementById('docList');
+  const rows = [];
+  for (const clinic of clinicList) {
+    for (const dr of DOCTOR_ORDER[clinic]) {
+      const baseTarget = TARGETS[clinic][dr];
+      const challengeTarget = TARGETS_CHALLENGE[clinic][dr];
+      const maxOpen = MAX_OPEN[clinic] && MAX_OPEN[clinic][dr];
+      const dinfo = clinicData[clinic] && clinicData[clinic].perDoctor[dr];
+      const accum = dinfo ? dinfo.booked : 0;
+      // 停診處理
+      if (dr === '陳威龍' && clinic === '新竹') {
+        rows.push({ clinic, dr, isInactive: true, note: '6月起已停診' });
+        continue;
+      }
+      // 用「最高開放」為軸(如果沒有 max, fallback 用挑戰目標)
+      // 但注意有些醫師 基準 > 最高開放 (如高雄李唐越)  →  以較大者為軸,並警示
+      const axisMax = Math.max(maxOpen || challengeTarget, challengeTarget, accum);
+      const capMax = maxOpen || challengeTarget;
+      const overCap = maxOpen && baseTarget > maxOpen;  // 基準超過開放上限
+      // 各線位置百分比
+      const fillP = axisMax > 0 ? (accum / axisMax) * 100 : 0;
+      const baseP = axisMax > 0 ? (baseTarget / axisMax) * 100 : 0;
+      const challengeP = axisMax > 0 ? (challengeTarget / axisMax) * 100 : 0;
+      const maxP = axisMax > 0 && maxOpen ? (maxOpen / axisMax) * 100 : 100;
+      // 📍 今日應到 = (dayN/totalDays) × 基準
+      const todayShould = (dayN / totalDays) * baseTarget;
+      const todayP = axisMax > 0 ? (todayShould / axisMax) * 100 : 0;
+      // 判定狀態
+      let statusText, statusClass, suggestion, fillClass;
+      const achieveRate = baseTarget > 0 ? (accum / baseTarget) / timeProg : 0;
+      if (accum >= challengeTarget) {
+        statusText = '🚀 突破挑戰';
+        statusClass = 'g';
+        fillClass = 'g';
+        suggestion = '✅ 表現優異，維持策略';
+      } else if (accum >= baseTarget) {
+        statusText = '🎯 達基準';
+        statusClass = 'g';
+        fillClass = 'g';
+        suggestion = '✅ 目標已達，衝挑戰目標';
+      } else if (accum >= todayShould * 0.9) {
+        statusText = '準點進度';
+        statusClass = 'g';
+        fillClass = 'g';
+        suggestion = '✅ 進度上，維持投放';
+      } else if (accum >= todayShould * 0.75) {
+        // 略慢
+        const shortfall = Math.round((todayShould - accum) / (baseTarget / totalDays));
+        statusText = `略慢 ${shortfall} 天`;
+        statusClass = 'y';
+        fillClass = 'y';
+        suggestion = '👁 監控素材成效';
+      } else {
+        const shortfall = Math.round((todayShould - accum) / (baseTarget / totalDays));
+        statusText = `落後 ${shortfall} 天`;
+        statusClass = 'r';
+        fillClass = 'r';
+        suggestion = '⚠ 加日預算 / 換素材 / 檢查取消率';
+      }
+      // 計算當月花費 & CPA
+      let spendMTD = 0, metaBooked = 0;
+      // 花費開診日切分 (開診前 / 開診後，僅計算到目前檢視日 dayN 為止)
+      let spendBefore = null, spendAfter = null, spendOpenDate = null, spendOpenP = null;
+      const adInfo = AD_SNAPSHOT[String(month)] && AD_SNAPSHOT[String(month)][clinic] && AD_SNAPSHOT[String(month)][clinic].doctors;
+      if (adInfo) {
+        // 對應醫師 key (儀表板名 vs snapshot 名)
+        const drKey = dr === '不指定 (分流)' ? '不指定' : (dr === '楊德仁 (新)' ? '楊德仁' : dr);
+        const adData = adInfo[drKey];
+        if (adData) {
+          const dayIdx = Math.min(dayN - 1, adData.spend.length - 1);
+          spendMTD = adData.spend.slice(0, dayIdx + 1).reduce((s,v) => s + (v||0), 0);
+          metaBooked = adData.meta.slice(0, dayIdx + 1).reduce((s,v) => s + (v||0), 0);
+          const nextMonth = String(month + 1);
+          const oDate = OPENING_DATES[nextMonth] && OPENING_DATES[nextMonth][clinic];
+          const adDates = AD_SNAPSHOT[String(month)][clinic].dates;
+          if (oDate) {
+            const splitIdx = adDates.indexOf(oDate);
+            // 只有當開診日落在「目前已檢視到的範圍內」才顯示切分
+            if (splitIdx > 0 && splitIdx <= dayIdx) {
+              spendOpenDate = oDate;
+              spendBefore = adData.spend.slice(0, splitIdx).reduce((s,v) => s + (v||0), 0);
+              spendAfter = adData.spend.slice(splitIdx, dayIdx + 1).reduce((s,v) => s + (v||0), 0);
+              spendOpenP = spendMTD > 0 ? (spendBefore / spendMTD) * 100 : 0;
+            }
+          }
+        }
+      }
+      const bench = AD_BENCHMARK[clinic] && AD_BENCHMARK[clinic][dr === '不指定 (分流)' ? '不指定' : (dr === '楊德仁 (新)' ? '楊德仁' : dr)];
+      const budget = bench ? bench.baseline_spend : 0;
+      const cpaMedian = bench ? bench.cpa_median : 0;
+      const currentCPA = metaBooked > 0 ? Math.round(spendMTD / metaBooked) : null;
+      const spendPct = budget > 0 ? spendMTD / budget : 0;
+      let cpaClass = 'n';
+      if (currentCPA && cpaMedian) {
+        if (currentCPA <= cpaMedian * 1.2) cpaClass = 'g';
+        else if (currentCPA <= cpaMedian * 1.5) cpaClass = 'y';
+        else cpaClass = 'r';
+      }
+      rows.push({
+        clinic, dr, baseTarget, challengeTarget, maxOpen, accum,
+        statusText, statusClass, suggestion, fillClass,
+        fillP, baseP, challengeP, maxP, todayP, overCap,
+        spendMTD, budget, spendPct, currentCPA, cpaMedian, cpaClass, metaBooked,
+        spendBefore, spendAfter, spendOpenDate, spendOpenP
+      });
+    }
+  }
+  el.innerHTML = rows.map(r => {
+    if (r.isInactive) {
+      return `<div class="doc-row st-inactive">
+        <div class="doc-clinic">${r.clinic}</div>
+        <div class="doc-name">${r.dr}</div>
+        <div class="doc-progress"><div class="doc-progress-fill i" style="width: 0%">已停診</div></div>
+        <div class="doc-status-text" style="color:#888;">⏸ ${r.note}</div>
+        <div class="doc-suggestion">不追蹤</div>
+      </div>`;
+    }
+    const maxLabel = r.maxOpen ? `上限 ${r.maxOpen}` : '';
+    const overWarning = r.overCap ? '<span style="color:#C0392B;font-size:11px;">⚠ 基準超上限</span>' : '';
+    // 花費 info block
+    const spendInfoHtml = r.budget > 0 ? `
+      <div class="doc-spend-info">
+        <div>
+          <span class="doc-spend-label">💰 花費 $${r.spendMTD.toLocaleString()}</span>
+          / 預算 $${r.budget.toLocaleString()} (${(r.spendPct*100).toFixed(0)}%)
+          ${r.spendOpenDate ? `<div class="doc-spend-split-label">🚪 開診前 $${r.spendBefore.toLocaleString()} / 開診後(${r.spendOpenDate.replace('2026/','')}起) $${r.spendAfter.toLocaleString()}</div>` : ''}
+          <div class="doc-spend-bar" style="margin-top:3px;">
+            ${r.spendOpenDate ? `
+            <div class="doc-spend-fill-before ${r.spendPct > 1 ? 'over' : ''}" style="width: ${(Math.min(100, r.spendPct*100) * (r.spendOpenP/100)).toFixed(1)}%"></div>
+            <div class="doc-spend-fill-after ${r.spendPct > 1 ? 'over' : ''}" style="left: ${(Math.min(100, r.spendPct*100) * (r.spendOpenP/100)).toFixed(1)}%; width: ${(Math.min(100, r.spendPct*100) * (1 - r.spendOpenP/100)).toFixed(1)}%"></div>
+            ` : `
+            <div class="doc-spend-fill ${r.spendPct > 1 ? 'over' : ''}" style="width: ${Math.min(100, r.spendPct*100).toFixed(0)}%"></div>
+            `}
+          </div>
+        </div>
+        <div style="text-align:center;">
+          Meta 預約 ${r.metaBooked}
+        </div>
+        <div style="text-align:center;">
+          <span class="doc-cpa-badge ${r.cpaClass}">
+            CPA ${r.currentCPA ? '$' + r.currentCPA.toLocaleString() : 'N/A'}
+          </span>
+          <div style="font-size: 10px; color: #888; margin-top: 3px;">
+            標準 ${r.cpaMedian ? '$' + r.cpaMedian.toLocaleString() : 'N/A'}
+          </div>
+        </div>
+      </div>
+    ` : `<div class="doc-spend-info" style="grid-template-columns:1fr;">
+        <div style="text-align:center; color:#888; font-size:11.5px; padding:6px;">
+          📭 目前無獨立廣告投放
+        </div>
+      </div>`;
+    return `<div class="doc-row-wrap">
+      <div class="doc-row st-${r.statusClass === 'g' ? 'green' : (r.statusClass === 'y' ? 'yellow' : 'red')}">
+      <div class="doc-clinic">${r.clinic}</div>
+      <div class="doc-name">${r.dr} ${overWarning}</div>
+      <div class="doc-progress">
+        <div class="doc-time-marker" style="left: ${Math.min(100, r.todayP).toFixed(1)}%"></div>
+        <div class="doc-base-marker" style="left: ${Math.min(100, r.baseP).toFixed(1)}%"></div>
+        <div class="doc-challenge-marker" style="left: ${Math.min(100, r.challengeP).toFixed(1)}%"></div>
+        <div class="doc-progress-fill ${r.fillClass}" style="width: ${Math.min(100, r.fillP).toFixed(1)}%">${r.accum}</div>
+        ${r.maxOpen ? `<div class="doc-max-badge">🏁 ${maxLabel}</div>` : ''}
+      </div>
+      <div class="doc-status-text ${r.statusClass}">
+        ${r.statusText}
+        <span class="sub">累積 ${r.accum} / 基準 ${r.baseTarget}${r.challengeTarget ? ' / 挑戰 ' + r.challengeTarget : ''}</span>
+      </div>
+      <div class="doc-suggestion">${r.suggestion}</div>
+      </div>
+      ${spendInfoHtml}
+    </div>`;
+  }).join('');
+}
+function renderCompareCards(clinicList, month, dayN) {
+  const el = document.getElementById('compareGrid');
+  const prevM = month - 1, prev2M = month - 2;
+  const cards = [];
+  for (const clinic of clinicList) {
+    for (const dr of DOCTOR_ORDER[clinic]) {
+      if (dr === '陳威龍' && clinic === '新竹') continue;
+      const findKey = (dataObj) => {
+        if (!dataObj) return null;
+        if (dataObj[dr]) return dr;
+        const short = dr.replace(' (新)', '').replace(' (分流)', '');
+        if (dataObj[short]) return short;
+        return null;
+      };
+      const cur = getMonthAtDay(month, clinic, dayN);
+      const prev = getMonthAtDay(prevM, clinic, dayN);
+      const prev2 = getMonthAtDay(prev2M, clinic, dayN);
+      let curB, prevB, prev2B, curR, prevR, prev2R;
+      if (dr === '不指定 (分流)') {
+        curB = cur ? Object.values(cur).reduce((s,v) => s + (v.unspec || 0), 0) : 0;
+        prevB = prev ? Object.values(prev).reduce((s,v) => s + (v.unspec || 0), 0) : 0;
+        prev2B = prev2 ? Object.values(prev2).reduce((s,v) => s + (v.unspec || 0), 0) : 0;
+        curR = prevR = prev2R = null;
+      } else {
+        const kc = findKey(cur), kp = findKey(prev), kp2 = findKey(prev2);
+        curB = kc ? cur[kc].booked : 0;
+        prevB = kp ? prev[kp].booked : 0;
+        prev2B = kp2 ? prev2[kp2].booked : 0;
+        const curT = kc ? cur[kc].total : 0;
+        const prevT = kp ? prev[kp].total : 0;
+        const prev2T = kp2 ? prev2[kp2].total : 0;
+        curR = curT > 0 ? curB / curT : null;
+        prevR = prevT > 0 ? prevB / prevT : null;
+        prev2R = prev2T > 0 ? prev2B / prev2T : null;
+      }
+      const trendNP = prevB > 0 ? Math.round((curB - prevB) / prevB * 100) : null;
+      let cardClass, trendIcon, trendClass, verdict;
+      if (trendNP === null) {
+        cardClass = 'stable'; trendIcon = '—'; trendClass = 'flat';
+        verdict = '無足夠資料判斷趨勢';
+      } else if (trendNP >= 15) {
+        cardClass = 'growing'; trendIcon = '🚀'; trendClass = 'up';
+        verdict = `<strong>強勁成長</strong>：本月同期比上月同期多 ${trendNP}%，趨勢向上。`;
+      } else if (trendNP >= 5) {
+        cardClass = 'growing'; trendIcon = '↗'; trendClass = 'up';
+        verdict = `<strong>穩定成長</strong>：本月同期比上月同期多 ${trendNP}%。`;
+      } else if (trendNP >= -5) {
+        cardClass = 'stable'; trendIcon = '→'; trendClass = 'flat';
+        verdict = `<strong>持平</strong>：本月與上月同期相當（${trendNP > 0 ? '+' : ''}${trendNP}%）。`;
+      } else if (trendNP >= -15) {
+        cardClass = 'declining'; trendIcon = '↘'; trendClass = 'down';
+        verdict = `<strong>略微衰退</strong>：本月同期比上月同期少 ${-trendNP}%，需觀察。`;
+      } else {
+        cardClass = 'declining'; trendIcon = '⚠'; trendClass = 'down';
+        verdict = `<strong>明顯衰退</strong>：本月同期比上月同期少 ${-trendNP}%，需優先處理。`;
+      }
+      cards.push({
+        clinic, dr, cardClass, trendIcon, trendClass,
+        prev2M, prevM, month,
+        prev2B, prevB, curB,
+        prev2R, prevR, curR,
+        verdict, sortKey: trendNP === null ? 999 : -trendNP
+      });
+    }
+  }
+  cards.sort((a,b) => a.sortKey - b.sortKey);
+  el.innerHTML = cards.map(c => `
+    <div class="compare-card ${c.cardClass}">
+      <div class="compare-header">
+        <div>
+          <div style="font-size:11px; color:#888;">${c.clinic}</div>
+          <div class="compare-title">${c.dr}</div>
+        </div>
+        <div class="compare-trend ${c.trendClass}">${c.trendIcon}</div>
+      </div>
+      <div class="compare-months">
+        <div class="compare-month">
+          <div class="m-label">${c.prev2M} 月</div>
+          <div class="m-np">${c.prev2B}</div>
+          <div class="m-rate">${c.prev2R !== null ? Math.round(c.prev2R*100) + '%' : ''}</div>
+        </div>
+        <div class="compare-month">
+          <div class="m-label">${c.prevM} 月</div>
+          <div class="m-np">${c.prevB}</div>
+          <div class="m-rate">${c.prevR !== null ? Math.round(c.prevR*100) + '%' : ''}</div>
+        </div>
+        <div class="compare-month now">
+          <div class="m-label">${c.month} 月至今</div>
+          <div class="m-np">${c.curB}</div>
+          <div class="m-rate">${c.curR !== null ? Math.round(c.curR*100) + '%' : ''}</div>
+        </div>
+      </div>
+      <div class="compare-verdict">${c.verdict}</div>
+    </div>
+  `).join('');
+}
+function renderUnspecCharts(clinicList) {
+  const canvas = document.getElementById('chartUnspec');
+  if (chartUnspecInstance) chartUnspecInstance.destroy();
+  const datasets = [];
+  const colors = { '台北': '#2E5A3A', '新竹': '#8B5530', '高雄': '#7A3A1A' };
+  const styles = { 5: [4,4], 6: [8,2], 7: [] };
+  for (const clinic of clinicList) {
+    for (const m of [5, 6, 7]) {
+      const raw = SNAPSHOT[m] && SNAPSHOT[m][clinic];
+      if (!raw) continue;
+      const days = raw.dates.length;
+      const data = [];
+      for (let i = 0; i < days; i++) {
+        let sum = 0;
+        for (const dr in raw.doctors) {
+          const u = raw.doctors[dr].unspec || [];
+          if (u[i] !== null && u[i] !== undefined) sum += u[i];
+        }
+        data.push(sum);
+      }
+      datasets.push({
+        label: `${clinic} ${m}月`, data,
+        borderColor: colors[clinic],
+        backgroundColor: colors[clinic] + '22',
+        borderDash: styles[m],
+        tension: 0.2, pointRadius: 1, fill: false
+      });
+    }
+  }
+  const maxDays = Math.max(...datasets.map(d => d.data.length), 31);
+  const labels = Array.from({length: maxDays}, (_, i) => `Day ${i+1}`);
+  chartUnspecInstance = new Chart(canvas, {
+    type: 'line', data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 10 }, boxWidth: 20 } },
+                 tooltip: { mode: 'index', intersect: false } },
+      scales: { y: { beginAtZero: true, title: { display: true, text: '不指定 NP 累積' } } }
+    }
+  });
+  const canvas2 = document.getElementById('chartUnspecRatio');
+  if (chartUnspecRatioInstance) chartUnspecRatioInstance.destroy();
+  const doctors = [], rates5 = [], rates6 = [], rates7 = [];
+  for (const clinic of clinicList) {
+    const f5 = getMonthFinal(5, clinic) || {};
+    const f6 = getMonthFinal(6, clinic) || {};
+    const f7 = getMonthFinal(7, clinic) || {};
+    for (const dr of DOCTOR_ORDER[clinic]) {
+      if (dr.startsWith('不指定') || (dr === '陳威龍' && clinic === '新竹')) continue;
+      const short = dr.replace(' (新)', '');
+      const b5 = (f5[short] || f5[dr]) ? (f5[short] || f5[dr]).booked : 0;
+      const u5 = (f5[short] || f5[dr]) ? (f5[short] || f5[dr]).unspec : 0;
+      const b6 = (f6[short] || f6[dr]) ? (f6[short] || f6[dr]).booked : 0;
+      const u6 = (f6[short] || f6[dr]) ? (f6[short] || f6[dr]).unspec : 0;
+      const b7 = (f7[short] || f7[dr]) ? (f7[short] || f7[dr]).booked : 0;
+      const u7 = (f7[short] || f7[dr]) ? (f7[short] || f7[dr]).unspec : 0;
+      const r5 = b5 > 0 ? u5/b5 : 0;
+      const r6 = b6 > 0 ? u6/b6 : 0;
+      const r7 = b7 > 0 ? u7/b7 : 0;
+      if (r5 + r6 + r7 > 0) {
+        doctors.push(`${clinic[0]}·${dr}`);
+        rates5.push(Math.round(r5*100));
+        rates6.push(Math.round(r6*100));
+        rates7.push(Math.round(r7*100));
+      }
+    }
+  }
+  chartUnspecRatioInstance = new Chart(canvas2, {
+    type: 'bar',
+    data: { labels: doctors, datasets: [
+      { label: '5月', data: rates5, backgroundColor: '#C08020' },
+      { label: '6月', data: rates6, backgroundColor: '#8B5530' },
+      { label: '7月 (至今)', data: rates7, backgroundColor: '#2E5A3A' }
+    ]},
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top', labels: { font: { size: 11 } } },
+                 tooltip: { callbacks: { label: (ctx) => `${ctx.dataset.label}: ${ctx.parsed.y}%` } } },
+      scales: {
+        y: { beginAtZero: true, max: 100, title: { display: true, text: '不指定率 (%)' } },
+        x: { ticks: { font: { size: 10 } } }
+      }
+    }
+  });
+}
+function renderTrendChart(clinicList, clinicData) {
+  const canvas = document.getElementById('chart');
+  if (chartInstance) chartInstance.destroy();
+  const datasets = [];
+  const colors = { '台北': '#2E5A3A', '新竹': '#8B5530', '高雄': '#7A3A1A' };
+  let maxLen = 0;
+  for (const clinic of clinicList) {
+    if (!clinicData[clinic]) continue;
+    const perDoctor = clinicData[clinic].perDoctor;
+    const dates = clinicData[clinic].dates || [];
+    if (dates.length === 0) continue;
+    const daily = new Array(dates.length).fill(0);
+    for (const name in perDoctor) {
+      if (name.startsWith('不指定')) continue;
+      const series = perDoctor[name].series || [];
+      for (let i = 0; i < series.length && i < daily.length; i++) {
+        if (series[i] !== null && series[i] !== undefined) daily[i] += series[i];
+      }
+    }
+    maxLen = Math.max(maxLen, daily.length);
+    datasets.push({
+      label: `${clinic} 累積`, data: daily,
+      borderColor: colors[clinic], backgroundColor: colors[clinic] + '33',
+      tension: 0.2, pointRadius: 3, fill: false
+    });
+  }
+  if (clinicList.length === 1) {
+    const clinic = clinicList[0];
+    const perDoctor = clinicData[clinic].perDoctor;
+    const drColors = ['#E67E22','#8E44AD','#16A085','#D35400','#2980B9','#C0392B','#27AE60','#7F8C8D','#F39C12','#34495E'];
+    let i = 0;
+    for (const dr of DOCTOR_ORDER[clinic]) {
+      if (dr.startsWith('不指定')) continue;
+      const dinfo = perDoctor[dr];
+      if (!dinfo || !dinfo.series || dinfo.series.length === 0) continue;
+      datasets.push({
+        label: `${dr}`, data: dinfo.series,
+        borderColor: drColors[i % drColors.length],
+        backgroundColor: drColors[i % drColors.length] + '22',
+        tension: 0.2, pointRadius: 2, fill: false, borderDash: [3, 3]
+      });
+      i++;
+    }
+  }
+  let labels = [];
+  const firstAvail = clinicList.find(c => clinicData[c] && clinicData[c].dates && clinicData[c].dates.length > 0);
+  if (firstAvail) {
+    labels = clinicData[firstAvail].dates.slice(0, maxLen).map(d => {
+      const m = d.match(/2026\/(\d+)\/(\d+)/);
+      return m ? `${m[1]}/${m[2]}` : d;
+    });
+  }
+  chartInstance = new Chart(canvas, {
+    type: 'line', data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { position: 'top' }, tooltip: { mode: 'index', intersect: false } },
+      scales: { x: { title: { display: true, text: '日期' } },
+                y: { title: { display: true, text: '累積 NP' }, beginAtZero: true } },
+      interaction: { mode: 'index', intersect: false }
+    }
+  });
+}
+function renderInsights(clinicList, clinicData, timeProg) {
+  const insights = [];
+  const gainers = [];
+  for (const clinic of clinicList) {
+    for (const dr of DOCTOR_ORDER[clinic]) {
+      if (dr.startsWith('不指定') || (dr === '陳威龍' && clinic === '新竹')) continue;
+      const dinfo = clinicData[clinic] && clinicData[clinic].perDoctor[dr];
+      if (!dinfo || !dinfo.series || dinfo.series.length < 2) continue;
+      const first = dinfo.series[0] || 0;
+      const last = dinfo.series[dinfo.series.length - 1] || 0;
+      const gain = last - first;
+      gainers.push({ clinic, dr, gain, target: TARGETS[clinic][dr] });
+    }
+  }
+  gainers.sort((a, b) => b.gain - a.gain);
+  const topGrower = gainers[0];
+  const bottomGrower = gainers[gainers.length - 1];
+  if (topGrower) {
+    insights.push({ type: 'pos', title: '🚀 本週增量之王', val: `+${topGrower.gain} NP`,
+      desc: `${topGrower.clinic} ${topGrower.dr} 本週累積增加最多，佔月目標 ${((topGrower.gain/topGrower.target)*100).toFixed(1)}%。素材與受眾配置有效，建議維持策略並觀察後續是否穩定成長。` });
+  }
+  if (bottomGrower && topGrower && bottomGrower.gain < (topGrower.gain / 3)) {
+    insights.push({ type: 'neg', title: '⚠️ 本週增量最少', val: `+${bottomGrower.gain} NP`,
+      desc: `${bottomGrower.clinic} ${bottomGrower.dr} 本週僅新增 ${bottomGrower.gain} NP。可能原因：素材疲乏、受眾飽和、預算不足。建議週中檢視素材成效與 CPA。` });
+  }
+  let redCount = 0, yellowCount = 0;
+  for (const clinic of clinicList) {
+    for (const dr of DOCTOR_ORDER[clinic]) {
+      if (dr === '陳威龍' && clinic === '新竹') continue;
+      const target = TARGETS[clinic][dr];
+      const dinfo = clinicData[clinic] && clinicData[clinic].perDoctor[dr];
+      const accum = dinfo ? dinfo.booked : 0;
+      const actualP = target > 0 ? accum / target : 0;
+      const achieve = timeProg > 0 && target > 0 ? actualP / timeProg : 0;
+      if (achieve < 0.75) redCount++;
+      else if (achieve < 0.9) yellowCount++;
+    }
+  }
+  insights.push({ type: redCount > 3 ? 'neg' : (yellowCount > 3 ? 'info' : 'pos'),
+    title: '🎯 整體風險盤點', val: `🔴 ${redCount}｜🟡 ${yellowCount}`,
+    desc: redCount > 3 ? `目前有 ${redCount} 位醫師處於🔴急迫狀態，需優先處理。` :
+          yellowCount > 3 ? `${yellowCount} 位醫師處於🟡觀察狀態，建議本週監控素材與 CPA 變化。` :
+          `整體狀況穩定，繼續維持目前投放策略即可。` });
+  let unspecTotal = 0, unspecTarget = 0;
+  for (const clinic of clinicList) {
+    unspecTarget += TARGETS[clinic]['不指定 (分流)'];
+    const dinfo = clinicData[clinic] && clinicData[clinic].perDoctor['不指定 (分流)'];
+    unspecTotal += dinfo ? dinfo.booked : 0;
+  }
+  const unspecRate = unspecTarget > 0 ? (unspecTotal/unspecTarget)/timeProg : 0;
+  insights.push({ type: unspecRate >= 0.9 ? 'pos' : (unspecRate >= 0.75 ? 'info' : 'neg'),
+    title: '🔀 不指定漏斗表現', val: `達成率 ${pct(unspecRate)}`,
+    desc: unspecRate >= 0.9 ? `不指定漏斗表現正常，各院所導流順暢。` :
+          `不指定累積 ${unspecTotal}/${unspecTarget}，${unspecRate < 0.75 ? '嚴重落後' : '略為觀察'}。可能需檢視不指定廣告素材與預算配置。` });
+  const growers = gainers.filter(g => g.gain > 0).length;
+  const totalDoctors = gainers.length;
+  const growRate = totalDoctors > 0 ? growers / totalDoctors : 0;
+  insights.push({ type: 'info', title: '📢 行銷建議',
+    val: `${growers}/${totalDoctors} 位醫師成長`,
+    desc: growRate >= 0.7 ? `多數醫師呈現成長趨勢，可考慮：（1）擴大成功切角測試；（2）試新受眾包；（3）觀察 CPA 是否有走高警訊。` :
+          growRate >= 0.4 ? `成長醫師比例中等，建議：（1）暫停高 CPA 素材；（2）加碼低 CPA 素材；（3）檢視受眾疲乏度（頻次）。` :
+          `多數醫師成長停滯，建議：（1）緊急檢查素材品質；（2）與診所端釐清 no-show/取消率；（3）考慮全面換素材策略。` });
+  const el = document.getElementById('insights');
+  el.innerHTML = insights.map(i => `
+    <div class="insight-card ${i.type}">
+      <h4>${i.title}</h4>
+      <div class="val ${i.type === 'neg' ? 'neg' : ''}">${i.val}</div>
+      <div class="desc">${i.desc}</div>
+    </div>`).join('');
+}
+function init() {
+  const sel = document.getElementById('monthSel');
+  for (let m = 5; m <= 12; m++) {
+    const opt = document.createElement('option');
+    opt.value = m; opt.textContent = `${m} 月`;
+    sel.appendChild(opt);
+  }
+  sel.value = 7;
+  const dateSel = document.getElementById('dateSel');
+  dateSel.value = SNAPSHOT_DATE;
+  dateSel.min = '2026-05-01';
+  dateSel.max = '2026-09-30';
+  const clinicSel = document.getElementById('clinicSel');
+  function refresh() {
+    const m = parseInt(sel.value);
+    const c = clinicSel.value;
+    render(m, dateSel.value, c);
+    // 若非 progress tab, 也重跑 active tab
+    const activeTab = document.querySelector('.tab-btn.active');
+    if (activeTab) {
+      const t = activeTab.dataset.tab;
+      if (t === 'spend') renderSpendTab(m, c);
+      else if (t === 'angle') renderAngleTab(m, c);
+      else if (t === 'audience') renderAudienceTab(m, c);
+      else if (t === 'overall') renderOverallTab(m, c);
+    }
+  }
+  sel.addEventListener('change', refresh);
+  dateSel.addEventListener('change', refresh);
+  clinicSel.addEventListener('change', refresh);
+  refresh();
+  initTabs();
+  const angleDoctorSel = document.getElementById('angleDoctorSel');
+  const angleTypeSel = document.getElementById('angleTypeSel');
+  function refreshAngle() {
+    const m = parseInt(sel.value);
+    const c = clinicSel.value;
+    renderAngleTab(m, c);
+  }
+  angleDoctorSel.addEventListener('change', refreshAngle);
+  angleTypeSel.addEventListener('change', refreshAngle);
+}
+// ==================== Sprint 2: Tab & 4 render 函數 ====================
+let chartSpend = null, chartAngle = null, chartAudience = null, chartOverall = null;
+function initTabs() {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      btn.classList.add('active');
+      const tab = btn.dataset.tab;
+      document.getElementById('tab-' + tab).classList.add('active');
+      // 觸發對應 render
+      const month = parseInt(document.getElementById('monthSel').value);
+      const clinic = document.getElementById('clinicSel').value;
+      if (tab === 'spend') renderSpendTab(month, clinic);
+      else if (tab === 'angle') renderAngleTab(month, clinic);
+      else if (tab === 'audience') renderAudienceTab(month, clinic);
+      else if (tab === 'overall') renderOverallTab(month, clinic);
+    });
+  });
+}
+// ========== 分頁 A: 花費追蹤 ==========
+function renderSpendTab(month, clinic) {
+  const clinicList = clinic === '全部' ? ['台北','新竹','高雄'] : [clinic];
+  // KPI cards: 各院所本月花費 vs 預算
+  const cards = [];
+  let totalSpend = 0, totalBudget = 0;
+  for (const cl of clinicList) {
+    const ad = AD_SNAPSHOT[String(month)] && AD_SNAPSHOT[String(month)][cl];
+    if (!ad) continue;
+    let cSpend = 0;
+    for (const dr in ad.doctors) {
+      cSpend += ad.doctors[dr].spend.reduce((s,v) => s + (v||0), 0);
+    }
+    let cBudget = 0;
+    if (AD_BENCHMARK[cl]) {
+      for (const dr in AD_BENCHMARK[cl]) {
+        cBudget += AD_BENCHMARK[cl][dr].baseline_spend || 0;
+      }
+    }
+    totalSpend += cSpend; totalBudget += cBudget;
+    cards.push({label: cl + ' 院所', val: '$' + Math.round(cSpend).toLocaleString(),
+                sub: `預算 $${Math.round(cBudget).toLocaleString()} (${cBudget > 0 ? Math.round(cSpend/cBudget*100) : 0}%)`});
+  }
+  cards.unshift({label: '三院所合計花費', val: '$' + Math.round(totalSpend).toLocaleString(),
+                 sub: `預算 $${Math.round(totalBudget).toLocaleString()} (${totalBudget > 0 ? Math.round(totalSpend/totalBudget*100) : 0}%)`});
+  document.getElementById('spendCards').innerHTML = cards.map(c =>
+    `<div class="info-card"><h4>${c.label}</h4><div class="val">${c.val}</div><div class="sub">${c.sub}</div></div>`
+  ).join('');
+  // Chart: 各院所每日累積花費
+  if (chartSpend) chartSpend.destroy();
+  const colors = { '台北':'#2E5A3A', '新竹':'#8B5530', '高雄':'#7A3A1A' };
+  const datasets = [];
+  let labels = [];
+  for (const cl of clinicList) {
+    const ad = AD_SNAPSHOT[String(month)] && AD_SNAPSHOT[String(month)][cl];
+    if (!ad || !ad.dates) continue;
+    if (labels.length === 0) labels = ad.dates.map(d => d.replace('2026/',''));
+    const dailySum = new Array(ad.dates.length).fill(0);
+    for (const dr in ad.doctors) {
+      const sp = ad.doctors[dr].spend;
+      for (let i = 0; i < sp.length; i++) dailySum[i] += (sp[i]||0);
+    }
+    // 累積
+    const cum = [];
+    let acc = 0;
+    for (const v of dailySum) { acc += v; cum.push(acc); }
+    datasets.push({label: cl + ' 累積花費', data: cum,
+                   borderColor: colors[cl], backgroundColor: colors[cl]+'33', tension: 0.2});
+  }
+  chartSpend = new Chart(document.getElementById('chartSpend'), {
+    type: 'line', data: {labels, datasets},
+    options: {responsive: true, maintainAspectRatio: false,
+      plugins: {legend: {position: 'top'}},
+      scales: {y: {beginAtZero: true, title: {display: true, text: '累積花費 ($)'}}}}
+  });
+  renderOpeningSplit(month, clinicList);
+}
+// 開診日花費切分：以「次月開診日」(從NP資料自動偵測) 切分本月花費
+function renderOpeningSplit(month, clinicList) {
+  const nextMonth = String(month + 1);
+  const rows = [];
+  let anyOpening = false;
+  const openingLabels = [];
+  for (const cl of clinicList) {
+    const openDate = OPENING_DATES[nextMonth] && OPENING_DATES[nextMonth][cl];
+    const ad = AD_SNAPSHOT[String(month)] && AD_SNAPSHOT[String(month)][cl];
+    if (!ad || !ad.dates || ad.dates.length === 0) continue;
+    if (!openDate) {
+      rows.push({clinic: cl, noData: true});
+      continue;
+    }
+    anyOpening = true;
+    openingLabels.push(`${cl} ${openDate.replace('2026/','')}`);
+    let splitIdx = ad.dates.indexOf(openDate);
+    if (splitIdx === -1) {
+      // 開診日不在本月花費資料範圍內 (例如開診日在上個月) -> 全部算開診後
+      splitIdx = 0;
+    }
+    // splitIdx = 開診日當天的索引；開診前 = 索引前(不含開診日)，開診後 = 索引起(含開診日)
+    for (const dr in ad.doctors) {
+      const sp = ad.doctors[dr].spend;
+      const blockA = sp.slice(0, splitIdx).reduce((s,v) => s + (v||0), 0);
+      const blockB = sp.slice(splitIdx).reduce((s,v) => s + (v||0), 0);
+      const total = blockA + blockB;
+      if (total <= 0) continue;
+      rows.push({clinic: cl, dr: dr === '不指定' ? '不指定' : dr, blockA, blockB, total,
+                 pctB: total > 0 ? Math.round(blockB/total*100) : 0, openDate});
+    }
+  }
+  document.getElementById('openingDateChip').innerHTML = anyOpening
+    ? openingLabels.map(l => `<span class="chip">🚪 ${l} 開診</span>`).join('')
+    : '';
+  if (rows.length === 0) {
+    document.getElementById('openingSplitTable').innerHTML =
+      '<div style="color:#888;font-size:12px;padding:12px;">此月份尚無法偵測到次月開診日 (資料不足或次月尚未開始追蹤)</div>';
+    return;
+  }
+  rows.sort((a,b) => (b.total||0) - (a.total||0));
+  document.getElementById('openingSplitTable').innerHTML = `
+    <table class="mat-table">
+      <thead><tr>
+        <th>院所</th><th>醫師</th><th>開診日</th>
+        <th style="text-align:right">開診前花費</th><th style="text-align:right">開診後花費</th>
+        <th style="text-align:right">合計</th><th>開診後佔比</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => {
+          if (r.noData) return `<tr><td>${r.clinic}</td><td colspan="6" style="color:#888;">尚無法偵測次月開診日</td></tr>`;
+          return `<tr>
+            <td>${r.clinic}</td>
+            <td>${r.dr}</td>
+            <td>${r.openDate}</td>
+            <td style="text-align:right;">$${Math.round(r.blockA).toLocaleString()}</td>
+            <td style="text-align:right;">$${Math.round(r.blockB).toLocaleString()}</td>
+            <td style="text-align:right;">$${Math.round(r.total).toLocaleString()}</td>
+            <td><span class="mat-cpa-tag ${r.pctB >= 50 ? 'y' : 'g'}">${r.pctB}%</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+// ========== 分頁 B: 素材切角 ==========
+const ALL_ANGLES = ['月份型','區域型','案例型','品牌通用型','品牌痛點型','知識型','醫師IP','未分類'];
+function populateAngleFilters(clinicList) {
+  const drSel = document.getElementById('angleDoctorSel');
+  const tySel = document.getElementById('angleTypeSel');
+  const prevDr = drSel.value || '全部';
+  const prevTy = tySel.value || '全部';
+  const doctorSet = new Set();
+  for (const cl of clinicList) {
+    for (const d of (DOCTOR_ORDER[cl] || [])) doctorSet.add(d.replace(' (新)','').replace(' (分流)',''));
+  }
+  drSel.innerHTML = '<option value="全部">全部醫師</option>' +
+    Array.from(doctorSet).map(d => `<option value="${d}">${d}</option>`).join('');
+  drSel.value = doctorSet.has(prevDr) ? prevDr : '全部';
+  tySel.innerHTML = '<option value="全部">全部切角</option>' +
+    ALL_ANGLES.map(a => `<option value="${a}">${a}</option>`).join('');
+  tySel.value = prevTy;
+}
+function renderAngleTab(month, clinic) {
+  const clinicList = clinic === '全部' ? ['台北','新竹','高雄'] : [clinic];
+  populateAngleFilters(clinicList);
+  const drFilter = document.getElementById('angleDoctorSel').value;
+  const tyFilter = document.getElementById('angleTypeSel').value;
+  document.getElementById('angleFilterChip').innerHTML =
+    (drFilter !== '全部' ? `<span class="chip">👨‍⚕️ ${drFilter}</span>` : '') +
+    (tyFilter !== '全部' ? `<span class="chip">🎨 ${tyFilter}</span>` : '');
+  // 用 ANGLE_BY_DOCTOR (完整資料, 非僅 Top20) 依 院所/醫師/切角 篩選彙總
+  const angleData = {};
+  for (const a of ALL_ANGLES) angleData[a] = {spend:0, meta:0};
+  for (const cl of clinicList) {
+    const byDr = ANGLE_BY_DOCTOR[String(month)] && ANGLE_BY_DOCTOR[String(month)][cl];
+    if (!byDr) continue;
+    for (const dr in byDr) {
+      if (drFilter !== '全部' && dr !== drFilter) continue;
+      for (const a in byDr[dr]) {
+        if (tyFilter !== '全部' && a !== tyFilter) continue;
+        if (!angleData[a]) angleData[a] = {spend:0, meta:0};
+        angleData[a].spend += byDr[dr][a].spend;
+        angleData[a].meta += byDr[dr][a].meta;
+      }
+    }
+  }
+  if (chartAngle) chartAngle.destroy();
+  const angleLabels = ALL_ANGLES.filter(a => angleData[a] && angleData[a].spend > 0);
+  const spendVals = angleLabels.map(a => angleData[a].spend);
+  const cpaVals = angleLabels.map(a => angleData[a].meta > 0 ? Math.round(angleData[a].spend/angleData[a].meta) : 0);
+  chartAngle = new Chart(document.getElementById('chartAngle'), {
+    data: {
+      labels: angleLabels,
+      datasets: [
+        {type: 'bar', label: '花費 ($)', data: spendVals, backgroundColor: '#8B5530', yAxisID: 'y1'},
+        {type: 'line', label: 'CPA ($)', data: cpaVals, borderColor: '#C0392B', backgroundColor: '#C0392B33', yAxisID: 'y2', tension: 0.2}
+      ]
+    },
+    options: {responsive: true, maintainAspectRatio: false,
+      plugins: {legend: {position: 'top'}},
+      scales: {
+        y1: {type: 'linear', position: 'left', title: {display: true, text: '花費 ($)'}, beginAtZero: true},
+        y2: {type: 'linear', position: 'right', title: {display: true, text: 'CPA ($)'}, beginAtZero: true, grid: {drawOnChartArea: false}}
+      }
+    }
+  });
+  // Top 素材表 (同時套用院所/醫師/切角篩選；素材資料本身僅收錄各院所 Top20 高花費，篩選後可能少於 20 筆)
+  const mats = [];
+  for (const cl of clinicList) {
+    const list = MATERIAL_TOP[cl] || [];
+    for (const m of list) mats.push({...m, clinic: cl});
+  }
+  const filtered = mats.filter(m =>
+    (drFilter === '全部' || m.doctor === drFilter) &&
+    (tyFilter === '全部' || m.angle === tyFilter)
+  );
+  filtered.sort((a,b) => b.spend - a.spend);
+  const top20 = filtered.slice(0, 20);
+  document.getElementById('materialTable').innerHTML = top20.length === 0
+    ? '<div style="color:#888;font-size:12px;padding:12px;">此篩選條件下無資料 (素材表僅收錄各院所花費前20名，篩選範圍外的素材不會出現)</div>'
+    : `
+    <table class="mat-table">
+      <thead><tr>
+        <th>#</th><th>院所</th><th>素材名稱</th><th>醫師</th><th>切角</th><th>受眾</th>
+        <th style="text-align:right">花費</th><th style="text-align:right">預約</th><th>CPA</th>
+      </tr></thead>
+      <tbody>
+        ${top20.map((m,i) => {
+          let cpaClass = 'y';
+          if (m.cpa === null) cpaClass = 'y';
+          else if (m.cpa <= 3500) cpaClass = 'g';
+          else if (m.cpa >= 6000) cpaClass = 'r';
+          return `<tr>
+            <td>${i+1}</td>
+            <td>${m.clinic}</td>
+            <td style="max-width:280px; overflow:hidden; text-overflow:ellipsis;">${m.name}</td>
+            <td>${m.doctor || '-'}</td>
+            <td>${m.angle}</td>
+            <td>${m.audience}</td>
+            <td style="text-align:right;">$${m.spend.toLocaleString()}</td>
+            <td style="text-align:right;">${m.meta}</td>
+            <td><span class="mat-cpa-tag ${cpaClass}">${m.cpa ? '$'+m.cpa.toLocaleString() : 'N/A'}</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+// ========== 分頁 C: 受眾分析 ==========
+function renderAudienceTab(month, clinic) {
+  const clinicList = clinic === '全部' ? ['台北','新竹','高雄'] : [clinic];
+  const auds = ['NU','RT','ASC'];
+  const audData = {};
+  for (const a of auds) audData[a] = {spend:0, meta:0};
+  for (const cl of clinicList) {
+    const ad = AUDIENCE_SNAPSHOT[String(month)] && AUDIENCE_SNAPSHOT[String(month)][cl];
+    if (!ad) continue;
+    for (const a of auds) {
+      if (ad[a]) { audData[a].spend += ad[a].spend; audData[a].meta += ad[a].meta; }
+    }
+  }
+  // KPI 卡片
+  const cards = auds.map(a => {
+    const cpa = audData[a].meta > 0 ? Math.round(audData[a].spend/audData[a].meta) : 0;
+    const label = a === 'NU' ? 'NU 新客' : a === 'RT' ? 'RT 再行銷' : 'ASC Advantage+';
+    return `<div class="info-card">
+      <h4>${label}</h4>
+      <div class="val">$${cpa.toLocaleString()}</div>
+      <div class="sub">花費 $${audData[a].spend.toLocaleString()} / 預約 ${audData[a].meta}</div>
+    </div>`;
+  }).join('');
+  document.getElementById('audCards').innerHTML = cards;
+  if (chartAudience) chartAudience.destroy();
+  chartAudience = new Chart(document.getElementById('chartAudience'), {
+    data: {
+      labels: auds.map(a => a === 'NU' ? 'NU 新客' : a === 'RT' ? 'RT 再行銷' : 'ASC'),
+      datasets: [
+        {type: 'bar', label: '花費 ($)', data: auds.map(a => audData[a].spend), backgroundColor: '#4A6B52', yAxisID: 'y1'},
+        {type: 'line', label: 'CPA ($)', data: auds.map(a => audData[a].meta > 0 ? Math.round(audData[a].spend/audData[a].meta) : 0), borderColor: '#C0392B', backgroundColor: '#C0392B33', yAxisID: 'y2', tension: 0.2}
+      ]
+    },
+    options: {responsive: true, maintainAspectRatio: false,
+      plugins: {legend: {position: 'top'}},
+      scales: {
+        y1: {type: 'linear', position: 'left', title: {display: true, text: '花費 ($)'}, beginAtZero: true},
+        y2: {type: 'linear', position: 'right', title: {display: true, text: 'CPA ($)'}, beginAtZero: true, grid: {drawOnChartArea: false}}
+      }
+    }
+  });
+  // 高效受眾組合明細 (拆解到廣告組合層級，不只 NU/RT/ASC 大分類)
+  const detailRows = [];
+  for (const cl of clinicList) {
+    const list = (AUDIENCE_DETAIL[String(month)] && AUDIENCE_DETAIL[String(month)][cl]) || [];
+    for (const item of list) detailRows.push({...item, clinic: cl});
+  }
+  // 以院所醫師 CPA 中位數概念：改用該批次資料自身中位數當基準
+  const cpaVals2 = detailRows.map(r => r.cpa).filter(v => v !== null && v !== undefined);
+  cpaVals2.sort((a,b) => a-b);
+  const median2 = cpaVals2.length ? cpaVals2[Math.floor(cpaVals2.length/2)] : null;
+  detailRows.sort((a,b) => b.spend - a.spend);
+  const top15 = detailRows.slice(0, 15);
+  document.getElementById('audienceDetailTable').innerHTML = top15.length === 0
+    ? '<div style="color:#888;font-size:12px;padding:12px;">此篩選條件下無資料</div>'
+    : `
+    <table class="mat-table">
+      <thead><tr>
+        <th>#</th><th>院所</th><th>廣告組合名稱</th><th>大分類</th>
+        <th style="text-align:right">花費</th><th style="text-align:right">預約</th><th>CPA</th>
+      </tr></thead>
+      <tbody>
+        ${top15.map((r,i) => {
+          let cpaClass = 'y';
+          if (r.cpa === null || median2 === null) cpaClass = 'y';
+          else if (r.cpa <= median2 * 1.2) cpaClass = 'g';
+          else if (r.cpa >= median2 * 1.5) cpaClass = 'r';
+          const catLabel = r.category === 'NU' ? 'NU 新客' : r.category === 'RT' ? 'RT 再行銷' : r.category === 'ASC' ? 'ASC' : (r.category || '-');
+          return `<tr>
+            <td>${i+1}</td>
+            <td>${r.clinic}</td>
+            <td style="max-width:280px; overflow:hidden; text-overflow:ellipsis;">${r.name}</td>
+            <td>${catLabel}</td>
+            <td style="text-align:right;">$${r.spend.toLocaleString()}</td>
+            <td style="text-align:right;">${r.meta}</td>
+            <td><span class="mat-cpa-tag ${cpaClass}">${r.cpa ? '$'+r.cpa.toLocaleString() : 'N/A'}</span></td>
+          </tr>`;
+        }).join('')}
+      </tbody>
+    </table>`;
+}
+// ========== 分頁 D: 綜合成效 ==========
+function renderOverallTab(month, clinic) {
+  const clinicList = clinic === '全部' ? ['台北','新竹','高雄'] : [clinic];
+  // Meta vs NP 對照
+  const colors = {'台北':'#2E5A3A','新竹':'#8B5530','高雄':'#7A3A1A'};
+  const datasets = [];
+  let labels = [];
+  for (const cl of clinicList) {
+    // Meta
+    const ad = AD_SNAPSHOT[String(month)] && AD_SNAPSHOT[String(month)][cl];
+    // NP
+    const np = SNAPSHOT[String(month)] && SNAPSHOT[String(month)][cl];
+    if (!ad || !np) continue;
+    if (labels.length === 0) labels = np.dates.map(d => d.replace('2026/',''));
+    // Meta 累積 (取所有醫師合計)
+    const dLen = np.dates.length;
+    const metaCum = new Array(dLen).fill(0);
+    if (ad.dates) {
+      for (const dr in ad.doctors) {
+        const mt = ad.doctors[dr].meta;
+        // 匹配到 np dates 的 index
+        for (let i = 0; i < Math.min(mt.length, dLen); i++) metaCum[i] += (mt[i]||0);
+      }
+      // 累積
+      for (let i = 1; i < metaCum.length; i++) metaCum[i] += metaCum[i-1];
+    }
+    // NP 當日累積 (從 np booked 取)
+    const npCum = new Array(dLen).fill(0);
+    for (const dr in np.doctors) {
+      const b = np.doctors[dr].booked || [];
+      for (let i = 0; i < b.length && i < dLen; i++) {
+        if (b[i] !== null && b[i] !== undefined) npCum[i] += b[i];
+      }
+    }
+    datasets.push({label: cl + ' Meta 完成預約 (累積)', data: metaCum, borderColor: colors[cl], backgroundColor: colors[cl]+'33', tension: 0.2});
+    datasets.push({label: cl + ' NP 已預約', data: npCum, borderColor: colors[cl], backgroundColor: colors[cl]+'66', borderDash: [5,5], tension: 0.2});
+  }
+  if (chartOverall) chartOverall.destroy();
+  chartOverall = new Chart(document.getElementById('chartOverall'), {
+    type: 'line', data: {labels, datasets},
+    options: {responsive: true, maintainAspectRatio: false,
+      plugins: {legend: {position: 'top'}, tooltip: {mode: 'index', intersect: false}},
+      scales: {y: {beginAtZero: true, title: {display: true, text: '預約數'}}}}
+  });
+}
+document.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>
