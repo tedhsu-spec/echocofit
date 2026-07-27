@@ -893,19 +893,23 @@ function renderDocList(clinicList, clinicData, timeProg, dayN, totalDays, month)
     const maxLabel = r.maxOpen ? `上限 ${r.maxOpen}` : '';
     const overWarning = r.overCap ? '<span style="color:#C0392B;font-size:11px;">⚠ 基準超上限</span>' : '';
     // 花費 info block
-    const spendInfoHtml = r.budget > 0 ? `
+    // 注意：不能只看 r.budget（歷史Apr-Jun基準）來判斷有沒有廣告投放，
+    // 新醫師/新開的獨立投放可能沒有歷史基準(budget=0)但當月已經有實際花費，
+    // 要用「當月是否有花費或有Meta預約」來判斷才對。
+    const hasSpendData = r.budget > 0 || r.spendMTD > 0 || r.metaBooked > 0;
+    const spendInfoHtml = hasSpendData ? `
       <div class="doc-spend-info">
         <div>
           <span class="doc-spend-label">💰 花費 $${r.spendMTD.toLocaleString()}</span>
-          / 預算 $${r.budget.toLocaleString()} (${(r.spendPct*100).toFixed(0)}%)
+          ${r.budget > 0 ? `/ 預算 $${r.budget.toLocaleString()} (${(r.spendPct*100).toFixed(0)}%)` : `<span style="color:#888;font-size:11px;">(尚無歷史基準，新投放)</span>`}
           ${r.spendOpenDate ? `<div class="doc-spend-split-label">🚪 開診前 $${r.spendBefore.toLocaleString()} / 開診後(${r.spendOpenDate.replace('2026/','')}起) $${r.spendAfter.toLocaleString()}</div>` : ''}
           <div class="doc-spend-bar" style="margin-top:3px;">
-            ${r.spendOpenDate ? `
+            ${r.budget > 0 ? (r.spendOpenDate ? `
             <div class="doc-spend-fill-before ${r.spendPct > 1 ? 'over' : ''}" style="width: ${(Math.min(100, r.spendPct*100) * (r.spendOpenP/100)).toFixed(1)}%"></div>
             <div class="doc-spend-fill-after ${r.spendPct > 1 ? 'over' : ''}" style="left: ${(Math.min(100, r.spendPct*100) * (r.spendOpenP/100)).toFixed(1)}%; width: ${(Math.min(100, r.spendPct*100) * (1 - r.spendOpenP/100)).toFixed(1)}%"></div>
             ` : `
             <div class="doc-spend-fill ${r.spendPct > 1 ? 'over' : ''}" style="width: ${Math.min(100, r.spendPct*100).toFixed(0)}%"></div>
-            `}
+            `) : ''}
           </div>
         </div>
         <div style="text-align:center;">
