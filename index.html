@@ -382,6 +382,19 @@ body.pw-locked > *:not(.pw-gate) { display: none !important; }
     <div id="npOpeningSplitTable"></div>
   </div>
   <div class="section">
+    <h2>📊 任意區間新增量分析 <span id="rangeAnalysisChip"></span></h2>
+    <p style="font-size:12px; color:#666; margin: 0 0 12px;">看選定期間內「新增」了多少 NP（不是累計值），可用來比較這週 vs 上週的成效。區間僅限於目前追蹤月份範圍內。</p>
+    <div style="margin-bottom:10px; display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+      <span class="sub" style="margin-right:4px; font-size:12px; color:#888;">快速選擇：</span>
+      <button class="btn-range-preset" data-preset="7" style="padding:5px 10px; border:1px solid #D9C8A8; border-radius:6px; cursor:pointer; font-size:12px; background:#fff;">過去 7 天</button>
+      <button class="btn-range-preset" data-preset="14" style="padding:5px 10px; border:1px solid #D9C8A8; border-radius:6px; cursor:pointer; font-size:12px; background:#fff;">過去 14 天</button>
+      <button class="btn-range-preset" data-preset="month" style="padding:5px 10px; border:1px solid #D9C8A8; border-radius:6px; cursor:pointer; font-size:12px; background:#2E5A3A; color:#fff;">本月至今</button>
+      <button class="btn-range-preset" data-preset="firsthalf" style="padding:5px 10px; border:1px solid #D9C8A8; border-radius:6px; cursor:pointer; font-size:12px; background:#fff;">本月上半</button>
+      <button class="btn-range-preset" data-preset="secondhalf" style="padding:5px 10px; border:1px solid #D9C8A8; border-radius:6px; cursor:pointer; font-size:12px; background:#fff;">本月下半</button>
+    </div>
+    <div id="rangeAnalysisTable"></div>
+  </div>
+  <div class="section">
     <h2>📆 三月同期比較 <span id="filterChip2"></span></h2>
     <p style="font-size:12px; color:#666; margin: 0 0 12px;">比較 5月、6月、7月同天位置的 NP 累積 — 卡片依趨勢排序，衰退最多在前</p>
     <div id="compareGrid" class="compare-grid"></div>
@@ -656,6 +669,7 @@ function statusOf(rate) {
 function pct(v) { return (v * 100).toFixed(0) + '%'; }
 let chartInstance = null, chartUnspecInstance = null, chartUnspecRatioInstance = null;
 let donutCharts = [];
+let currentRangePreset = 'month', lastRangeCtx = null;
 function render(month, endDate, filterClinic) {
   if (!SNAPSHOT[month]) {
     document.getElementById('clinicCards').innerHTML = '<div class="center-msg" style="grid-column: 1 / -1;">📭 該月份 sheet 尚未建立</div>';
@@ -692,17 +706,19 @@ function render(month, endDate, filterClinic) {
   let overallTarget = 0, overallAccum = 0;
   for (const clinic of clinicList) {
     const targets = TARGETS[clinic];
-    let target = 0, accum = 0;
+    let target = 0, accum = 0, totalCap = 0;
     for (const dr in targets) {
       if (dr.startsWith('不指定')) continue;  // 排除不指定,只算指定醫師
       target += targets[dr];
       if (clinicData[clinic] && clinicData[clinic].perDoctor[dr]) {
         accum += clinicData[clinic].perDoctor[dr].booked || 0;
+        totalCap += clinicData[clinic].perDoctor[dr].total || 0;
       }
     }
     overallTarget += target;
     overallAccum += accum;
     const actualProg = target > 0 ? accum / target : 0;
+    const fillRate = totalCap > 0 ? accum / totalCap : null;
     const clinicTP = timeProgByClinic[clinic];
     const achieveRate = clinicTP > 0 ? actualProg / clinicTP : 0;
     const st = statusOf(achieveRate);
@@ -716,6 +732,7 @@ function render(month, endDate, filterClinic) {
             <div class="card-row"><span class="card-label">目標 (指定醫師)</span><span class="card-big">${target}</span></div>
             <div class="card-row"><span class="card-label">累積</span><span class="card-big card-actual">${accum}</span></div>
             <div class="card-row"><span class="card-label">達成率</span><span class="card-big">${pct(achieveRate)} ${st.icon}</span></div>
+            <div class="card-row"><span class="card-label">約診滿率</span><span class="card-big" style="color:#6A4C93;">${fillRate != null ? pct(fillRate) : 'N/A'}</span></div>
           </div>
           <div class="donut-container"><canvas id="${donutId}"></canvas></div>
         </div>
@@ -756,10 +773,87 @@ function render(month, endDate, filterClinic) {
   renderAlerts(clinicList, clinicData, timeProgByClinic);
   renderDocList(clinicList, clinicData, timeProgByClinic, dayN, totalDays, month, yr, mm, dd, progMode);
   renderNPOpeningSplit(month, clinicList, dayN);
+  lastRangeCtx = { clinicList, month, dayN };
+  renderRangeAnalysis(clinicList, month, dayN, currentRangePreset);
   renderCompareCards(clinicList, month, dayN);
   renderUnspecCharts(clinicList);
   renderTrendChart(clinicList, clinicData);
   renderInsights(clinicList, clinicData, timeProgByClinic, timeProg);
+}
+// 任意區間新增量分析：在目前追蹤月份範圍內，依快速預設(preset)算出各醫師該區間「新增」了多少 NP，
+// 並比對同期廣告花費，算出區間 CPA。跟「累積達成率」是互補視角：這裡看的是「節奏」而非「達標與否」。
+function renderRangeAnalysis(clinicList, month, dayN, preset) {
+  const el = document.getElementById('rangeAnalysisTable');
+  if (!el) return;
+  document.querySelectorAll('.btn-range-preset').forEach(b => {
+    const active = b.dataset.preset === preset;
+    b.style.background = active ? '#2E5A3A' : '#fff';
+    b.style.color = active ? '#fff' : '#333';
+  });
+  const presetLabels = { '7':'過去7天', '14':'過去14天', 'month':'本月至今', 'firsthalf':'本月上半(1-15日)', 'secondhalf':'本月下半(16日起)' };
+  const rows = [];
+  for (const clinic of clinicList) {
+    const raw = SNAPSHOT[String(month)] && SNAPSHOT[String(month)][clinic];
+    if (!raw || !raw.dates || raw.dates.length === 0) continue;
+    const maxIdx = Math.min(dayN, raw.dates.length) - 1;
+    if (maxIdx < 0) continue;
+    let startIdx, endIdx;
+    if (preset === '7') { endIdx = maxIdx; startIdx = Math.max(0, endIdx - 6); }
+    else if (preset === '14') { endIdx = maxIdx; startIdx = Math.max(0, endIdx - 13); }
+    else if (preset === 'firsthalf') { startIdx = 0; endIdx = Math.min(maxIdx, 14); }
+    else if (preset === 'secondhalf') { startIdx = 15; endIdx = maxIdx; }
+    else { startIdx = 0; endIdx = maxIdx; }
+    if (endIdx < startIdx) continue; // 該區間尚未到達(例如選了本月下半但還沒到16號)
+    const adRaw = AD_SNAPSHOT[String(month)] && AD_SNAPSHOT[String(month)][clinic];
+    for (const drRaw in raw.doctors) {
+      const dr = normalizeDoctorName(drRaw);
+      if (dr === '陳威龍' && clinic === '新竹') continue;
+      const b = raw.doctors[drRaw].booked || [];
+      const endVal = (endIdx < b.length && b[endIdx] != null) ? b[endIdx] : 0;
+      const baseVal = (startIdx > 0 && (startIdx - 1) < b.length && b[startIdx - 1] != null) ? b[startIdx - 1] : 0;
+      const delta = endVal - baseVal;
+      let spendDelta = null, cpaRange = null;
+      const adKey = dr === '不指定 (分流)' ? '不指定' : dr;
+      const adData = adRaw && adRaw.doctors && adRaw.doctors[adKey];
+      if (adData && adData.dates && adData.dates.length) {
+        const si = adData.dates.indexOf(raw.dates[startIdx]);
+        const ei = adData.dates.indexOf(raw.dates[endIdx]);
+        if (si !== -1 && ei !== -1) {
+          spendDelta = 0;
+          for (let i = si; i <= ei; i++) spendDelta += (adData.spend[i] || 0);
+        }
+      }
+      if (spendDelta != null && delta > 0) cpaRange = Math.round(spendDelta / delta);
+      if (delta === 0 && (spendDelta == null || spendDelta === 0)) continue;
+      rows.push({ clinic, dr, startDate: raw.dates[startIdx], endDate: raw.dates[endIdx], delta, spendDelta, cpaRange });
+    }
+  }
+  rows.sort((a, b) => b.delta - a.delta);
+  const chip = document.getElementById('rangeAnalysisChip');
+  if (chip) chip.innerHTML = rows.length ? `<span class="chip">📆 ${presetLabels[preset] || preset}</span>` : '';
+  if (rows.length === 0) {
+    el.innerHTML = '<div style="color:#888;font-size:12px;padding:12px;">此區間尚無資料(可能該區間還沒到，或此月份剛開始追蹤)</div>';
+    return;
+  }
+  el.innerHTML = `
+    <table class="mat-table">
+      <thead><tr>
+        <th>院所</th><th>醫師</th><th>期間</th>
+        <th style="text-align:right">新增 NP</th>
+        <th style="text-align:right">期間花費</th>
+        <th style="text-align:right">區間 CPA</th>
+      </tr></thead>
+      <tbody>
+        ${rows.map(r => `<tr>
+          <td>${r.clinic}</td>
+          <td>${r.dr}</td>
+          <td>${r.startDate} ~ ${r.endDate}</td>
+          <td style="text-align:right; font-weight:700;">${r.delta > 0 ? '+' : ''}${r.delta}</td>
+          <td style="text-align:right;">${r.spendDelta != null ? '$' + Math.round(r.spendDelta).toLocaleString() : '—'}</td>
+          <td style="text-align:right;">${r.cpaRange != null ? '$' + r.cpaRange.toLocaleString() : '—'}</td>
+        </tr>`).join('')}
+      </tbody>
+    </table>`;
 }
 function renderAlerts(clinicList, clinicData, timeProgByClinic) {
   const redAlerts = [], yellowAlerts = [];
@@ -890,6 +984,7 @@ function renderDocList(clinicList, clinicData, timeProgByClinic, dayN, totalDays
       const maxOpen = MAX_OPEN[clinic] && MAX_OPEN[clinic][dr];
       const dinfo = clinicData[clinic] && clinicData[clinic].perDoctor[dr];
       const accum = dinfo ? dinfo.booked : 0;
+      const fillRate = (dinfo && dinfo.total > 0) ? accum / dinfo.total : null;
       // 停診處理
       if (dr === '陳威龍' && clinic === '新竹') {
         rows.push({ clinic, dr, isInactive: true, note: '6月起已停診' });
@@ -987,11 +1082,19 @@ function renderDocList(clinicList, clinicData, timeProgByClinic, dayN, totalDays
         else if (currentCPA <= cpaMedian * 1.5) cpaClass = 'y';
         else cpaClass = 'r';
       }
+      // 真實CPA(NP口徑)：分母改用「本月實際NP新增」而非 Meta 平台自報的完成預約事件，
+      // 兩者對照可看出 Meta 轉換數字跟診所實際到診的落差。「不指定(分流)」為合成列，沒有連續序列資料，不計算。
+      let realCPA = null;
+      if (dr !== '不指定 (分流)' && dinfo && dinfo.series && dinfo.series.length > 0 && spendMTD > 0) {
+        const startVal = dinfo.series[0] || 0;
+        const npDeltaMTD = Math.max(0, accum - startVal);
+        if (npDeltaMTD > 0) realCPA = Math.round(spendMTD / npDeltaMTD);
+      }
       rows.push({
-        clinic, dr, baseTarget, challengeTarget, maxOpen, accum,
+        clinic, dr, baseTarget, challengeTarget, maxOpen, accum, fillRate,
         statusText, statusClass, suggestion, fillClass,
         fillP, baseP, challengeP, maxP, todayP, overCap, todayRefLabel,
-        spendMTD, budget, spendPct, currentCPA, cpaMedian, cpaClass, metaBooked,
+        spendMTD, budget, spendPct, currentCPA, cpaMedian, cpaClass, metaBooked, realCPA,
         spendBefore, spendAfter, spendOpenDate, spendOpenP
       });
     }
@@ -1044,6 +1147,7 @@ function renderDocList(clinicList, clinicData, timeProgByClinic, dayN, totalDays
           <div style="font-size: 10px; color: #888; margin-top: 3px;">
             標準 ${r.cpaMedian ? '$' + r.cpaMedian.toLocaleString() : 'N/A'}
           </div>
+          ${r.realCPA != null ? `<div style="font-size: 10px; color: #6A4C93; margin-top: 3px;" title="花費 ÷ 本月實際NP新增數(非Meta完成預約事件)">真實CPA $${r.realCPA.toLocaleString()}</div>` : ''}
         </div>
       </div>
     ` : `<div class="doc-spend-info" style="grid-template-columns:1fr;">
@@ -1064,7 +1168,7 @@ function renderDocList(clinicList, clinicData, timeProgByClinic, dayN, totalDays
       </div>
       <div class="doc-status-text ${r.statusClass}">
         ${r.statusText}
-        <span class="sub">累積 ${r.accum} / 基準 ${r.baseTarget}${r.challengeTarget ? ' / 挑戰 ' + r.challengeTarget : ''}${r.todayRefLabel || ''}</span>
+        <span class="sub">累積 ${r.accum} / 基準 ${r.baseTarget}${r.challengeTarget ? ' / 挑戰 ' + r.challengeTarget : ''}${r.todayRefLabel || ''}${r.fillRate != null ? ` · 滿率 ${Math.round(r.fillRate*100)}%` : ''}</span>
       </div>
       <div class="doc-suggestion">${r.suggestion}</div>
       </div>
@@ -1421,6 +1525,12 @@ function init() {
   sel.addEventListener('change', refresh);
   dateSel.addEventListener('change', refresh);
   clinicSel.addEventListener('change', refresh);
+  document.querySelectorAll('.btn-range-preset').forEach(btn => {
+    btn.addEventListener('click', () => {
+      currentRangePreset = btn.dataset.preset;
+      if (lastRangeCtx) renderRangeAnalysis(lastRangeCtx.clinicList, lastRangeCtx.month, lastRangeCtx.dayN, currentRangePreset);
+    });
+  });
   refresh();
   initTabs();
   const angleDoctorSel = document.getElementById('angleDoctorSel');
